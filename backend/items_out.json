@@ -1,0 +1,154 @@
+[
+  {
+    "id": 1,
+    "categoryId": 1,
+    "name": "Cà Phê Đen Đá",
+    "price": 25000,
+    "description": "Cà phê Phin Robusta Đắk Lắk đậm đà nguyên chất",
+    "image": "https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400"
+  },
+  {
+    "id": 2,
+    "categoryId": 1,
+    "name": "Cà Phê Sữa Đá",
+    "price": 29000,
+    "description": "Cà phê phin kết hợp sữa đặc Ngôi Sao Phương Nam thơm béo",
+    "image": "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400"
+  },
+  {
+    "id": 3,
+    "categoryId": 1,
+    "name": "Cà Phê Muối Huế",
+    "price": 35000,
+    "description": "Lớp kem muối béo ngậy quyện cùng cà phê phin đậm vị",
+    "image": "https://images.unsplash.com/photo-1572442388796-11668a67e53d?w=400"
+  },
+  {
+    "id": 4,
+    "categoryId": 1,
+    "name": "Bạc Xỉu Sài Gòn",
+    "price": 32000,
+    "description": "Nhiều sữa ít cà phê, béo ngậy ngọt dịu thích hợp cho mọi người",
+    "image": "https://images.unsplash.com/photo-1541167760496-1628856ab772?w=400"
+  },
+  {
+    "id": 5,
+    "categoryId": 1,
+    "name": "Cà Phê Trứng Hà Nội",
+    "price": 39000,
+    "description": "Kem trứng đánh bông sánh mịn trên nền espresso đậm đà",
+    "image": "https://images.unsplash.com/photo-1585828068978-07495230175b?w=400"
+  },
+  {
+    "id": 6,
+    "categoryId": 2,
+    "name": "Espresso Doppio",
+    "price": 35000,
+    "description": "Cà phê nguyên chất chiết suất áp suất cao 2 shot",
+    "image": "https://images.unsplash.com/photo-1510591509098-f4fdc6d0ff04?w=400"
+  },
+  {
+    "id": 7,
+    "categoryId": 2,
+    "name": "Americano Đá",
+    "price": 32000,
+    "description": "Espresso pha loãng với nước tinh khiết & đá mát lạnh",
+    "image": "https://images.pexels.com/photos/5741238/pexels-photo-5741238.jpeg?auto=compress&cs=tinysrgb&w=400"
+  },
+  {
+    "id": 8,
+    "categoryId": 2,
+    "name": "Cappuccino Cinnamon",
+    "price": 45000,
+    "description": "Espresso cùng bọt sữa mịn rắc bột quế thơm lừng",
+    "image": "https://images.unsplash.com/photo-1570968915860-54d5c301fa9f?w=400"
+  },
+  {
+    "id": 9,
+    "categoryId": 2,
+    "name": "Caramel Latte",
+    "price": 49000,
+    "description": "Sữa tươi thanh trùng, espresso và sốt caramel béo ngọt",
+    "image": "https://images.unsplash.com/photo-1534778101976-62847782c213?w=400"
+  },
+  {
+    "id": 10,
+    "categoryId": 3,
+    "name": "Trà Đào Cam Sả",
+    "price": 39000,
+    "description": "Trà đen đậm vị kết hợp sả tươi, cam vàng và đào miếng giòn",
+    "image": "https://images.unsplash.com/photo-1556679343-c7306c1976bc?w=400"
+  },
+  {
+    "id": 11,
+    "categoryId": 3,
+    "name": "Trà Mãng Cầu Đắk Lắk",
+    "price": 39000,
+    "description": "Trà nhài thanh mát và thịt mãng cầu tươi chua ngọt hấp dẫn",
+    "image": "https://images.unsplash.com/photo-1544787219-7f47ccb76574?w=400"
+  },
+  {
+    "id": 12,
+    "categoryId": 3,
+    "name": "Trà Sen Vàng Kem Cheese",
+    "price": 45000,
+    "description": "Trà oolong, hạt sen béo bùi và lớp kem cheese mặn béo",
+    "image": "https://images.unsplash.com/photo-1576092768241-dec231879fc3?w=400"
+  },
+  {
+    "id": 13,
+    "categoryId": 3,
+    "name": "Matcha Latte Uji Nhật Bản",
+    "price": 45000,
+    "description": "Bột Matcha cao cấp nhập khẩu Nhật Bản và sữa tươi",
+    "image": "https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400"
+  },
+  {
+    "id": 14,
+    "categoryId": 4,
+    "name": "Sinh Tố Bơ Đắk Lắk Gelato",
+    "price": 45000,
+    "description": "Bơ sáp béo dẻo xay cùng sữa tươi và kem gelato dừa",
+    "image": "https://images.unsplash.com/photo-1623065422902-30a2d299bbe4?w=400"
+  },
+  {
+    "id": 15,
+    "categoryId": 4,
+    "name": "Freeze Cà Phê Phin Sô-cô-la",
+    "price": 49000,
+    "description": "Cà phê đá xay cùng thạch cà phê giòn ngon và kem tươi",
+    "image": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=400"
+  },
+  {
+    "id": 16,
+    "categoryId": 4,
+    "name": "Matcha Ice Blended",
+    "price": 49000,
+    "description": "Matcha đá xay rắc vụn bánh oreo và kem tươi phủ trên",
+    "image": "https://images.unsplash.com/photo-1515823064-d6e0c04616a7?w=400"
+  },
+  {
+    "id": 17,
+    "categoryId": 5,
+    "name": "Bánh Croissant Bơ Tỏi",
+    "price": 35000,
+    "description": "Bánh sừng bò ngàn lớp thơm lừng bơ Pháp tươi nóng",
+    "image": "https://images.unsplash.com/photo-1555507036-ab1f4038808a?w=400"
+  },
+  {
+    "id": 18,
+    "categoryId": 5,
+    "name": "Bánh Tiramisu Ca Cao",
+    "price": 39000,
+    "description": "Bánh tiramisu Ý mềm mịn, thơm hương rượu rum & cafe",
+    "image": "https://images.pexels.com/photos/6880219/pexels-photo-6880219.jpeg?auto=compress&cs=tinysrgb&w=400"
+  },
+  {
+    "id": 19,
+    "categoryId": 5,
+    "name": "Cheesecake Chanh Dây",
+    "price": 42000,
+    "description": "Bánh phô mai nướng phủ sốt chanh dây tươi chua ngọt",
+    "image": "https://images.pexels.com/photos/10141891/pexels-photo-10141891.jpeg?auto=compress&cs=tinysrgb&w=400"
+  }
+]

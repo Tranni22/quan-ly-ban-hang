@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment variables
+.env
+.env.local
+
+# Backups & Logs
+.agent_backups/
+.agent_code_index.json
+.agent_memory.json
+*.log
+
+# System files
+.DS_Store
+Thumbs.db
