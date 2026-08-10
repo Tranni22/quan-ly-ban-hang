@@ -604,7 +604,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
               </span>
             </div>
             <div>
-              <div className="text-[11px] text-amber-200 font-bold">Giỏ hàng đã chọn</div>
+              <div className="text-[11px] text-amber-200 font-bold">Món đã chọn</div>
               <div className="text-xs font-black text-white">{cartTotal.toLocaleString('vi-VN')} đ</div>
             </div>
           </div>
@@ -616,7 +616,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
             }}
             className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-coffee-950 font-black text-xs rounded-xl shadow transition"
           >
-            Xem giỏ hàng ↓
+            Xem món đã chọn ↓
           </button>
         </div>
       )}
