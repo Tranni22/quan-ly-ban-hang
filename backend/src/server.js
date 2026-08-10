@@ -551,6 +551,10 @@ app.get('/api/health', (req, res) => {
   return res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Cafe POS Backend đang chạy tại http://localhost:${PORT}`);
-});
+export default app;
+
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log(`🚀 Cafe POS Backend đang chạy tại http://localhost:${PORT}`);
+  });
+}

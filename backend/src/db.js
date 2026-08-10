@@ -1,8 +1,28 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
+import fs from 'node:fs';
 import bcrypt from 'bcryptjs';
 
-const dbPath = path.resolve('cafe.db');
+const isVercel = process.env.VERCEL === '1';
+let dbPath = path.resolve('cafe.db');
+
+if (isVercel) {
+  const tmpPath = path.join('/tmp', 'cafe.db');
+  try {
+    if (!fs.existsSync(tmpPath)) {
+      const origPath = path.resolve(process.cwd(), 'backend', 'cafe.db');
+      if (fs.existsSync(origPath)) {
+        fs.copyFileSync(origPath, tmpPath);
+      } else if (fs.existsSync(dbPath)) {
+        fs.copyFileSync(dbPath, tmpPath);
+      }
+    }
+    dbPath = tmpPath;
+  } catch (err) {
+    console.error('Lỗi sao chép DB trên Vercel:', err);
+  }
+}
+
 const db = new DatabaseSync(dbPath);
 
 // Enable Foreign Keys & Pragmas
