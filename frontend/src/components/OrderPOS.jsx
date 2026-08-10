@@ -62,7 +62,11 @@ const MenuItemCard = memo(function MenuItemCard({ item, onAddToCart }) {
 
         <button
           type="button"
-          className={`mt-2 w-full py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all duration-150 ${
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClick();
+          }}
+          className={`mt-2 w-full py-1.5 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 transition-all duration-150 cursor-pointer ${
             added
               ? 'bg-emerald-600 text-white shadow-xs'
               : 'bg-coffee-50 group-hover:bg-coffee-700 text-coffee-800 group-hover:text-white'
