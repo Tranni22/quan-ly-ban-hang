@@ -537,7 +537,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
 
         {/* Danh sách các món trong Giỏ hàng */}
-        <div className="flex-1 p-3 overflow-y-auto space-y-2.5">
+        <div className="flex-1 p-3 overflow-y-auto space-y-2.5 pb-28 sm:pb-3">
           {cart.length === 0 ? (
             <div className="p-8 text-center text-gray-400 flex flex-col items-center justify-center h-full">
               <Coffee className="w-12 h-12 text-gray-200 mb-2" />
