@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { Coffee, LayoutGrid, ShoppingBag, BarChart3, UtensilsCrossed, LogOut, User } from 'lucide-react';
+import { Coffee, LayoutGrid, ShoppingBag, BarChart3, UtensilsCrossed, LogOut, User, Sliders } from 'lucide-react';
 
 export default function Navbar({ activeTab, setActiveTab }) {
   const { user, logout } = useAuth();
@@ -48,6 +48,18 @@ export default function Navbar({ activeTab, setActiveTab }) {
 
             {user?.role === 'admin' && (
               <>
+                <button
+                  onClick={() => setActiveTab('table-designer')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition ${
+                    activeTab === 'table-designer'
+                      ? 'bg-coffee-700 text-amber-200 shadow-sm'
+                      : 'text-coffee-200 hover:bg-coffee-800 hover:text-white'
+                  }`}
+                >
+                  <Sliders className="w-4 h-4" />
+                  <span className="hidden sm:inline">Thiết Kế Bàn</span>
+                </button>
+
                 <button
                   onClick={() => setActiveTab('menu')}
                   className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-sm font-medium transition ${

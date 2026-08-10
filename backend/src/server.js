@@ -235,6 +235,44 @@ app.post('/api/tables', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+app.put('/api/tables/:id', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  const { name, area, seats, status } = req.body;
+
+  try {
+    const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(id);
+    if (!table) return res.status(404).json({ success: false, message: 'Bàn không tồn tại!' });
+
+    const stmt = db.prepare(`
+      UPDATE tables 
+      SET name = ?, area = ?, seats = ?, status = ?
+      WHERE id = ?
+    `);
+
+    stmt.run(
+      name !== undefined ? name : table.name,
+      area !== undefined ? area : table.area,
+      seats !== undefined ? Number(seats) : table.seats,
+      status !== undefined ? status : table.status,
+      id
+    );
+
+    return res.json({ success: true, message: 'Cập nhật thông tin bàn thành công!' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi cập nhật bàn!' });
+  }
+});
+
+app.delete('/api/tables/:id', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare('DELETE FROM tables WHERE id = ?').run(id);
+    return res.json({ success: true, message: 'Đã xóa bàn khỏi sơ đồ!' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi khi xóa bàn!' });
+  }
+});
+
 // --- ORDERS ROUTES ---
 app.get('/api/orders', authenticateToken, (req, res) => {
   const { status, date } = req.query;

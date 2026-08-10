@@ -48,6 +48,8 @@ export const apiService = {
   // Tables
   getTables: () => fetchApi('/tables'),
   createTable: (table) => fetchApi('/tables', { method: 'POST', body: JSON.stringify(table) }),
+  updateTable: (id, table) => fetchApi(`/tables/${id}`, { method: 'PUT', body: JSON.stringify(table) }),
+  deleteTable: (id) => fetchApi(`/tables/${id}`, { method: 'DELETE' }),
 
   // Orders
   getOrders: (params = '') => fetchApi(`/orders${params}`),

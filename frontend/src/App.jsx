@@ -7,6 +7,7 @@ import OrderPOS from './components/OrderPOS';
 import CheckoutModal from './components/CheckoutModal';
 import ReceiptInvoice from './components/ReceiptInvoice';
 import AdminDashboard from './components/AdminDashboard';
+import TableDesigner from './components/TableDesigner';
 
 function MainApp() {
   const { user } = useAuth();
@@ -66,6 +67,8 @@ function MainApp() {
             onCheckoutTable={handleCheckoutTable}
           />
         )}
+
+        {activeTab === 'table-designer' && <TableDesigner />}
 
         {activeTab === 'menu' && <AdminDashboard activeSubTab="menu" />}
 
