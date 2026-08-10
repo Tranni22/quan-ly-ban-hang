@@ -42,7 +42,7 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
         <div>
           <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Coffee className="w-6 h-6 text-coffee-600" />
-            Sơ Đồ Bàn Quán Cà Phê
+            Sơ đồ bàn của bố thắng code tặng idol duy ghi
           </h2>
           <p className="text-sm text-gray-500 mt-0.5">Chọn bàn để gọi món hoặc thực hiện thanh toán</p>
         </div>
