@@ -198,16 +198,14 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
 
       if (tablesRes.success) {
         setTables(tablesRes.data || []);
-        if (!selectedTable && tablesRes.data?.length > 0) {
-          setSelectedTable(tablesRes.data[0]);
-        }
+        setSelectedTable((prev) => (!prev && tablesRes.data?.length > 0 ? tablesRes.data[0] : prev));
       }
     } catch (err) {
       console.error('Lỗi khi tải dữ liệu POS:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedTable, setSelectedTable]);
+  }, [setSelectedTable]);
 
   useEffect(() => {
     loadData();
@@ -390,7 +388,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   );
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-[calc(100vh-100px)]">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-100px)] pb-16 md:pb-0 relative">
       {/* Khung thực đơn bên trái (Cols 7/12) */}
       <div className="lg:col-span-7 flex flex-col h-full bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
         {/* Thanh tìm kiếm & chọn danh mục */}
@@ -482,7 +480,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       </div>
 
       {/* Khung giỏ hàng & Thanh toán bên phải (Cols 5/12) */}
-      <div className="lg:col-span-5 flex flex-col h-full bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+      <div id="cart-section" className="lg:col-span-5 flex flex-col h-full bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 bg-coffee-900 text-white flex items-center justify-between">
           <div>
@@ -589,6 +587,34 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
           </div>
         </div>
       </div>
+
+      {/* Floating Cart Button cho Mobile khi có món trong giỏ */}
+      {cart.length > 0 && (
+        <div className="lg:hidden fixed bottom-14 left-3 right-3 bg-coffee-900 text-white p-3 rounded-2xl shadow-2xl z-30 flex items-center justify-between border border-amber-400/30">
+          <div className="flex items-center gap-2.5">
+            <div className="relative p-2 bg-amber-400 text-coffee-950 rounded-xl font-black text-xs">
+              <ShoppingBag className="w-5 h-5" />
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-extrabold border-2 border-coffee-900">
+                {cart.reduce((sum, i) => sum + i.quantity, 0)}
+              </span>
+            </div>
+            <div>
+              <div className="text-[11px] text-amber-200 font-bold">Giỏ hàng đã chọn</div>
+              <div className="text-xs font-black text-white">{cartTotal.toLocaleString('vi-VN')} đ</div>
+            </div>
+          </div>
+
+          <button
+            onClick={() => {
+              const cartElem = document.getElementById('cart-section');
+              if (cartElem) cartElem.scrollIntoView({ behavior: 'smooth' });
+            }}
+            className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-coffee-950 font-black text-xs rounded-xl shadow transition"
+          >
+            Xem giỏ hàng ↓
+          </button>
+        </div>
+      )}
     </div>
   );
 }

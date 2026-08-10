@@ -13,7 +13,7 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
     try {
       const res = await apiService.getTables();
       if (res.success) {
-        setTables(res.data);
+        setTables(res.data || []);
       }
     } catch (err) {
       setError('Lỗi tải danh sách bàn!');
@@ -28,15 +28,15 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
     return () => clearInterval(interval);
   }, []);
 
-  const areas = ['ALL', ...new Set(tables.map((t) => t.area))];
+  const areas = ['ALL', ...new Set((tables || []).map((t) => t.area))];
 
-  const filteredTables = selectedArea === 'ALL' ? tables : tables.filter((t) => t.area === selectedArea);
+  const filteredTables = selectedArea === 'ALL' ? (tables || []) : (tables || []).filter((t) => t.area === selectedArea);
 
-  const emptyCount = tables.filter((t) => t.status === 'EMPTY').length;
-  const servingCount = tables.filter((t) => t.status === 'SERVING').length;
+  const emptyCount = (tables || []).filter((t) => t.status === 'EMPTY').length;
+  const servingCount = (tables || []).filter((t) => t.status === 'SERVING').length;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5 pb-16 md:pb-0">
       {/* Top Banner & Stats */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm">
         <div>
@@ -89,7 +89,7 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
       {loading && tables.length === 0 ? (
         <div className="p-12 text-center text-gray-400">Đang tải danh sách bàn...</div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
           {filteredTables.map((table) => {
             const isServing = table.status === 'SERVING';
             const order = table.currentOrder;
@@ -97,7 +97,7 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
             return (
               <div
                 key={table.id}
-                className={`relative rounded-2xl p-4 border transition-all duration-200 flex flex-col justify-between h-44 shadow-sm hover:shadow-md ${
+                className={`relative rounded-2xl p-3 sm:p-4 border transition-all duration-200 flex flex-col justify-between min-h-[160px] h-auto shadow-sm hover:shadow-md ${
                   isServing
                     ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-amber-300 ring-2 ring-amber-400/20'
                     : 'bg-white border-gray-200 hover:border-coffee-500 hover:bg-coffee-50/20'
