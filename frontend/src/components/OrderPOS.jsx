@@ -13,7 +13,8 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
-  Check
+  Check,
+  ShoppingBag
 } from 'lucide-react';
 
 // Thẻ món ăn trong thực đơn - Đã bọc React.memo để tránh re-render khi giỏ hàng thay đổi
