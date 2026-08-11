@@ -12,14 +12,17 @@ import {
   XCircle,
   BarChart2,
   Calendar,
-  AlertCircle
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 
 export default function AdminDashboard({ activeSubTab = 'reports' }) {
   const [subTab, setSubTab] = useState(activeSubTab); // 'reports' or 'menu'
+  const [menuTab, setMenuTab] = useState('active'); // 'active' or 'deleted'
   const [dashboardData, setDashboardData] = useState(null);
   const [menu, setMenu] = useState([]);
   const [categories, setCategories] = useState([]);
+  const [deletedItems, setDeletedItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Form State cho thêm/sửa món
@@ -46,11 +49,24 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
       if (menuRes.success) {
         setCategories(menuRes.categories);
         setMenu(menuRes.allItems);
+        setDeletedItems(menuRes.deletedItems || []);
       }
     } catch (err) {
       console.error(err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleRestoreItem = async (id) => {
+    try {
+      const res = await apiService.restoreMenuItem(id);
+      if (res.success) {
+        alert('Khôi phục món ăn về thực đơn chính thành công!');
+        loadDashboardData();
+      }
+    } catch (err) {
+      alert(err.message || 'Lỗi khi khôi phục món!');
     }
   };
 
@@ -303,85 +319,184 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
         </div>
       ) : (
         /* MENU MANAGEMENT SECTION */
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-5">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-5 space-y-4">
+          {/* Sub-tabs cho Menu active và Menu đã xóa (Recycle Bin) */}
+          <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
+            <button
+              onClick={() => setMenuTab('active')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold transition flex items-center gap-1.5 ${
+                menuTab === 'active'
+                  ? 'bg-coffee-50 text-coffee-900 border border-coffee-200'
+                  : 'text-gray-500 hover:text-gray-800'
+              }`}
+            >
+              <span>✅ Đang Kinh Doanh</span>
+              <span className="bg-coffee-100 text-coffee-800 px-1.5 py-0.5 rounded-md text-[9px] font-bold">
+                {menu.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setMenuTab('deleted')}
+              className={`px-3 py-1.5 rounded-lg text-[11px] font-extrabold transition flex items-center gap-1.5 ${
+                menuTab === 'deleted'
+                  ? 'bg-red-50 text-red-800 border border-red-200'
+                  : 'text-gray-500 hover:text-red-600'
+              }`}
+            >
+              <span>🗑️ Thùng Rác (Đã Xóa)</span>
+              <span className="bg-red-100 text-red-800 px-1.5 py-0.5 rounded-md text-[9px] font-bold">
+                {deletedItems.length}
+              </span>
+            </button>
+          </div>
+
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-200">
-                <tr>
-                  <th className="p-3">Hình ảnh</th>
-                  <th className="p-3">Tên món</th>
-                  <th className="p-3">Danh mục</th>
-                  <th className="p-3">Giá bán</th>
-                  <th className="p-3">Trạng thái</th>
-                  <th className="p-3 text-right">Thao tác</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {menu.map((item) => (
-                  <tr key={item.id} className="hover:bg-gray-50/80 transition">
-                    <td className="p-3">
-                      <img
-                        src={item.image || 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400'}
-                        alt={item.name}
-                        onError={(e) => {
-                          e.target.onerror = null;
-                          e.target.src = 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400';
-                        }}
-                        className="w-10 h-10 rounded-xl object-cover border border-gray-200"
-                      />
-                    </td>
-                    <td className="p-3">
-                      <div className="font-bold text-gray-900 text-xs">{item.name}</div>
-                      <div className="text-[10px] text-gray-400 line-clamp-1">{item.description}</div>
-                    </td>
-                    <td className="p-3">
-                      <span className="px-2.5 py-1 bg-coffee-50 text-coffee-800 font-semibold rounded-lg text-[11px]">
-                        {item.categoryName}
-                      </span>
-                    </td>
-                    <td className="p-3 font-extrabold text-coffee-800">
-                      {item.price.toLocaleString('vi-VN')} đ
-                    </td>
-                    <td className="p-3">
-                      <button
-                        onClick={() => handleToggleAvailable(item)}
-                        className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 ${
-                          item.isAvailable
-                            ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                            : 'bg-red-100 text-red-800 hover:bg-red-200'
-                        }`}
-                      >
-                        {item.isAvailable ? (
-                          <>
-                            <CheckCircle className="w-3 h-3" /> Còn hàng
-                          </>
-                        ) : (
-                          <>
-                            <XCircle className="w-3 h-3" /> Hết hàng
-                          </>
-                        )}
-                      </button>
-                    </td>
-                    <td className="p-3 text-right space-x-1">
-                      <button
-                        onClick={() => handleOpenEditModal(item)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
-                        title="Sửa"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
-                        title="Xóa"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </td>
+            {menuTab === 'active' ? (
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-200">
+                  <tr>
+                    <th className="p-3">Hình ảnh</th>
+                    <th className="p-3">Tên món</th>
+                    <th className="p-3">Danh mục</th>
+                    <th className="p-3">Giá bán</th>
+                    <th className="p-3">Trạng thái</th>
+                    <th className="p-3 text-right">Thao tác</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {menu.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="p-8 text-center text-gray-400">
+                        Chưa có món ăn nào trong thực đơn. Nhấp "Thêm Món Mới" để bắt đầu!
+                      </td>
+                    </tr>
+                  ) : (
+                    menu.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50/80 transition">
+                        <td className="p-3">
+                          <img
+                            src={item.image || 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400'}
+                            alt={item.name}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400';
+                            }}
+                            className="w-10 h-10 rounded-xl object-cover border border-gray-200"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <div className="font-bold text-gray-900 text-xs">{item.name}</div>
+                          <div className="text-[10px] text-gray-400 line-clamp-1">{item.description}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2.5 py-1 bg-coffee-50 text-coffee-800 font-semibold rounded-lg text-[11px]">
+                            {item.categoryName || 'Món Khác'}
+                          </span>
+                        </td>
+                        <td className="p-3 font-extrabold text-coffee-800">
+                          {item.price.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="p-3">
+                          <button
+                            onClick={() => handleToggleAvailable(item)}
+                            className={`px-2.5 py-1 rounded-lg text-[10px] font-bold transition flex items-center gap-1 ${
+                              item.isAvailable
+                                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
+                                : 'bg-red-100 text-red-800 hover:bg-red-200'
+                            }`}
+                          >
+                            {item.isAvailable ? (
+                              <>
+                                <CheckCircle className="w-3 h-3" /> Còn hàng
+                              </>
+                            ) : (
+                              <>
+                                <XCircle className="w-3 h-3" /> Hết hàng
+                              </>
+                            )}
+                          </button>
+                        </td>
+                        <td className="p-3 text-right space-x-1">
+                          <button
+                            onClick={() => handleOpenEditModal(item)}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                            title="Sửa"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteItem(item.id)}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Xóa"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            ) : (
+              /* TAB THÙNG RÁC - HIỂN THỊ MÓN ĐÃ XÓA VÀ NÚT KHÔI PHỤC */
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-200">
+                  <tr>
+                    <th className="p-3">Hình ảnh</th>
+                    <th className="p-3">Tên món</th>
+                    <th className="p-3">Danh mục</th>
+                    <th className="p-3">Giá bán cũ</th>
+                    <th className="p-3 text-right">Khôi phục</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {deletedItems.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="p-8 text-center text-gray-400">
+                        Thùng rác trống rỗng. Chưa có món ăn nào bị xóa!
+                      </td>
+                    </tr>
+                  ) : (
+                    deletedItems.map((item) => (
+                      <tr key={item.id} className="hover:bg-red-50/20 transition">
+                        <td className="p-3">
+                          <img
+                            src={item.image || 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400'}
+                            alt={item.name}
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400';
+                            }}
+                            className="w-10 h-10 rounded-xl object-cover border border-gray-200 grayscale opacity-60"
+                          />
+                        </td>
+                        <td className="p-3">
+                          <div className="font-bold text-gray-500 text-xs line-through">{item.name}</div>
+                          <div className="text-[10px] text-gray-400 line-clamp-1">{item.description}</div>
+                        </td>
+                        <td className="p-3">
+                          <span className="px-2.5 py-1 bg-gray-100 text-gray-500 rounded-lg text-[11px]">
+                            {item.categoryName || 'Món Khác'}
+                          </span>
+                        </td>
+                        <td className="p-3 font-bold text-gray-500">
+                          {item.price.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => handleRestoreItem(item.id)}
+                            className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-[10px] rounded-xl shadow-xs transition flex items-center gap-1.5 ml-auto"
+                            title="Khôi phục món ăn này"
+                          >
+                            <RotateCcw className="w-3.5 h-3.5" /> Khôi Phục
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            )}
           </div>
         </div>
       )}

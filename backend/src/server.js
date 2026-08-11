@@ -113,11 +113,23 @@ app.post('/api/categories', authenticateToken, requireAdmin, (req, res) => {
 app.get('/api/menu', (req, res) => {
   try {
     const categories = db.prepare('SELECT * FROM categories ORDER BY sortOrder ASC').all();
+    
+    // Chỉ lấy món ăn chưa bị xóa
     const items = db.prepare(`
       SELECT m.*, c.name as categoryName 
       FROM menu_items m 
       JOIN categories c ON m.categoryId = c.id 
+      WHERE m.isDeleted = 0
       ORDER BY m.categoryId ASC, m.id ASC
+    `).all();
+
+    // Lấy các món đã bị xóa để hiển thị thùng rác khôi phục
+    const deletedItems = db.prepare(`
+      SELECT m.*, c.name as categoryName 
+      FROM menu_items m 
+      LEFT JOIN categories c ON m.categoryId = c.id 
+      WHERE m.isDeleted = 1
+      ORDER BY m.id DESC
     `).all();
 
     // Group items by category
@@ -126,8 +138,26 @@ app.get('/api/menu', (req, res) => {
       items: items.filter(item => item.categoryId === cat.id)
     }));
 
-    return res.json({ success: true, categories: categorizedMenu, allItems: items });
+    // Bổ sung nhóm "Món Khác" nếu có món nào có categoryId không hợp lệ/đã bị xóa danh mục
+    const orphanedItems = items.filter(item => !categories.some(cat => cat.id === item.categoryId));
+    if (orphanedItems.length > 0) {
+      categorizedMenu.push({
+        id: 'orphaned',
+        name: 'Món Khác',
+        icon: '🏷️',
+        sortOrder: 999,
+        items: orphanedItems
+      });
+    }
+
+    return res.json({ 
+      success: true, 
+      categories: categorizedMenu, 
+      allItems: items,
+      deletedItems: deletedItems 
+    });
   } catch (error) {
+    console.error('Lỗi tải danh sách món:', error);
     return res.status(500).json({ success: false, message: 'Lỗi tải danh sách món!' });
   }
 });
@@ -191,10 +221,22 @@ app.put('/api/menu/:id', authenticateToken, (req, res) => {
 app.delete('/api/menu/:id', authenticateToken, requireAdmin, (req, res) => {
   const { id } = req.params;
   try {
-    db.prepare('DELETE FROM menu_items WHERE id = ?').run(id);
-    return res.json({ success: true, message: 'Đã xóa món khỏi thực đơn!' });
+    // Chuyển sang Soft Delete (Đánh dấu đã xóa) để có thể khôi phục
+    db.prepare('UPDATE menu_items SET isDeleted = 1 WHERE id = ?').run(id);
+    return res.json({ success: true, message: 'Đã xóa món khỏi thực đơn chính! (Có thể khôi phục từ Thùng rác)' });
   } catch (error) {
     return res.status(500).json({ success: false, message: 'Lỗi khi xóa món!' });
+  }
+});
+
+app.put('/api/menu/:id/restore', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  try {
+    // Khôi phục món ăn về thực đơn chính
+    db.prepare('UPDATE menu_items SET isDeleted = 0 WHERE id = ?').run(id);
+    return res.json({ success: true, message: 'Khôi phục món ăn thành công!' });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: 'Lỗi khi khôi phục món ăn!' });
   }
 });
 

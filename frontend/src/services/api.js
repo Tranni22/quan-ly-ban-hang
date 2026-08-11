@@ -74,6 +74,7 @@ export const apiService = {
   createMenuItem: (item) => fetchApi('/menu', { method: 'POST', body: JSON.stringify(item) }),
   updateMenuItem: (id, item) => fetchApi(`/menu/${id}`, { method: 'PUT', body: JSON.stringify(item) }),
   deleteMenuItem: (id) => fetchApi(`/menu/${id}`, { method: 'DELETE' }),
+  restoreMenuItem: (id) => fetchApi(`/menu/${id}/restore`, { method: 'PUT' }),
 
   // Tables
   getTables: async () => {

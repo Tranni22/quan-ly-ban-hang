@@ -42,9 +42,17 @@ export function initDatabase() {
         description TEXT,
         image TEXT,
         isAvailable INTEGER DEFAULT 1,
+        isDeleted INTEGER DEFAULT 0,
         FOREIGN KEY (categoryId) REFERENCES categories(id) ON DELETE CASCADE
       );
     `);
+
+    // Thực hiện ALTER TABLE để tương thích an toàn nếu database cũ đã tồn tại
+    try {
+      db.exec('ALTER TABLE menu_items ADD COLUMN isDeleted INTEGER DEFAULT 0;');
+    } catch (e) {
+      // Bỏ qua nếu cột đã tồn tại
+    }
 
     db.exec(`
       CREATE TABLE IF NOT EXISTS tables (
