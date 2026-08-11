@@ -94,8 +94,10 @@ export const apiService = {
   saveOrder: (orderData) => fetchApi('/orders', { method: 'POST', body: JSON.stringify(orderData) }),
   payOrder: (orderId, payData) => fetchApi(`/orders/${orderId}/pay`, { method: 'PUT', body: JSON.stringify(payData) }),
   cancelOrder: (orderId) => fetchApi(`/orders/${orderId}`, { method: 'DELETE' }),
+  deleteOrder: (id) => fetchApi(`/orders/${id}`, { method: 'DELETE' }),
   getReceipt: (orderId) => fetchApi(`/orders/${orderId}/receipt`),
 
   // Dashboard Reports
-  getDashboard: () => fetchApi('/reports/dashboard')
+  getDashboard: () => fetchApi('/reports/dashboard'),
+  closeDay: () => fetchApi('/reports/close-day', { method: 'POST' })
 };

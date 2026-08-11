@@ -575,6 +575,28 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
       WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
     `).get();
 
+    // 1b. Thống kê tuần này (Tính từ Thứ 2 đến Chủ nhật của tuần hiện tại)
+    const weekSales = db.prepare(`
+      SELECT 
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(finalAmount), 0) as totalRevenue
+      FROM orders 
+      WHERE status = 'PAID' 
+        AND strftime('%Y', paidAt) = strftime('%Y', 'now')
+        AND strftime('%W', paidAt) = strftime('%W', 'now')
+    `).get();
+
+    // 1c. Thống kê tháng này
+    const monthSales = db.prepare(`
+      SELECT 
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(finalAmount), 0) as totalRevenue
+      FROM orders 
+      WHERE status = 'PAID' 
+        AND strftime('%Y', paidAt) = strftime('%Y', 'now')
+        AND strftime('%m', paidAt) = strftime('%m', 'now')
+    `).get();
+
     // 2. Tổng số bàn đang phục vụ
     const servingTables = db.prepare("SELECT COUNT(*) as count FROM tables WHERE status = 'SERVING'").get().count;
     const totalTables = db.prepare("SELECT COUNT(*) as count FROM tables").get().count;
@@ -605,7 +627,7 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
 
     // 5. Danh sách đơn hàng vừa thanh toán gần đây
     const recentOrders = db.prepare(`
-      SELECT * FROM orders ORDER BY id DESC LIMIT 10
+      SELECT * FROM orders ORDER BY id DESC LIMIT 20
     `).all();
 
     return res.json({
@@ -613,6 +635,10 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
       data: {
         todayRevenue: todaySales.totalRevenue,
         todayOrders: todaySales.totalOrders,
+        weekRevenue: weekSales.totalRevenue,
+        weekOrders: weekSales.totalOrders,
+        monthRevenue: monthSales.totalRevenue,
+        monthOrders: monthSales.totalOrders,
         servingTables,
         totalTables,
         topItems,
@@ -623,6 +649,36 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
   } catch (error) {
     console.error('Dashboard error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi tải báo cáo thống kê!' });
+  }
+});
+
+// Chốt ca / Chốt báo cáo ngày để dọn bàn, sẵn sàng bán tiếp ngày hôm sau
+app.post('/api/reports/close-day', authenticateToken, requireAdmin, (req, res) => {
+  try {
+    // 1. Chuyển trạng thái tất cả bàn về trống (EMPTY)
+    db.prepare("UPDATE tables SET status = 'EMPTY'").run();
+    // 2. Hủy các đơn hàng đang treo 'PENDING' để dọn sạch rác
+    db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE status = 'PENDING'").run();
+    
+    return res.json({ 
+      success: true, 
+      message: 'Chốt báo cáo ngày thành công! Toàn bộ sơ đồ bàn đã được dọn sạch về trạng thái trống để ngày mai sẵn sàng bán tiếp.' 
+    });
+  } catch (error) {
+    console.error('Close day error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi khi chốt ngày!' });
+  }
+});
+
+// Xóa hóa đơn cụ thể khỏi lịch sử để dọn bớt đơn hàng rác
+app.delete('/api/orders/:id', authenticateToken, requireAdmin, (req, res) => {
+  const { id } = req.params;
+  try {
+    db.prepare('DELETE FROM orders WHERE id = ?').run(id);
+    return res.json({ success: true, message: 'Đã xóa hóa đơn khỏi lịch sử thành công!' });
+  } catch (error) {
+    console.error('Delete order error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi khi xóa hóa đơn!' });
   }
 });
 

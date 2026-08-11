@@ -19,6 +19,7 @@ import {
 export default function AdminDashboard({ activeSubTab = 'reports' }) {
   const [subTab, setSubTab] = useState(activeSubTab); // 'reports' or 'menu'
   const [menuTab, setMenuTab] = useState('active'); // 'active' or 'deleted'
+  const [reportFilter, setReportFilter] = useState('day'); // 'day', 'week', 'month'
   const [dashboardData, setDashboardData] = useState(null);
   const [menu, setMenu] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -36,6 +37,34 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
     image: '',
     isAvailable: true
   });
+
+  const handleCloseDay = async () => {
+    if (confirm('BẠN CÓ CHẮC CHẮN MUỐN CHỐT BÁO CÁO NGÀY?\n\nHành động này sẽ:\n1. Đưa tất cả sơ đồ bàn về trạng thái Trống (EMPTY)\n2. Hủy các đơn hàng đang treo chưa trả tiền để làm sạch dữ liệu ca cũ.\n\nSẵn sàng để quán bắt đầu bán tiếp ca mới mượt mà!')) {
+      try {
+        const res = await apiService.closeDay();
+        if (res.success) {
+          alert(res.message);
+          loadDashboardData();
+        }
+      } catch (err) {
+        alert(err.message || 'Lỗi khi chốt ca bán hàng!');
+      }
+    }
+  };
+
+  const handleDeleteOrder = async (id) => {
+    if (confirm('Bạn có chắc chắn muốn xóa vĩnh viễn hóa đơn này khỏi lịch sử hệ thống để dọn bớt dữ liệu rác?')) {
+      try {
+        const res = await apiService.deleteOrder(id);
+        if (res.success) {
+          alert(res.message);
+          loadDashboardData();
+        }
+      } catch (err) {
+        alert(err.message || 'Lỗi khi xóa hóa đơn!');
+      }
+    }
+  };
 
   const loadDashboardData = async () => {
     setLoading(true);
@@ -138,11 +167,11 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
   return (
     <div className="space-y-6">
       {/* Top Tabs */}
-      <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
           <button
             onClick={() => setSubTab('reports')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               subTab === 'reports'
                 ? 'bg-coffee-800 text-amber-200 shadow-sm'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -152,7 +181,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
           </button>
           <button
             onClick={() => setSubTab('menu')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold transition ${
+            className={`px-4 py-2 rounded-xl text-xs font-bold transition whitespace-nowrap ${
               subTab === 'menu'
                 ? 'bg-coffee-800 text-amber-200 shadow-sm'
                 : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -165,38 +194,90 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
         {subTab === 'menu' && (
           <button
             onClick={handleOpenAddModal}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center gap-1.5"
+            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 w-full sm:w-auto"
           >
             <Plus className="w-4 h-4" /> Thêm Món Mới
+          </button>
+        )}
+
+        {subTab === 'reports' && (
+          <button
+            onClick={handleCloseDay}
+            className="px-4 py-2 bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 w-full sm:w-auto border border-red-500/20"
+            title="Chốt ca / Dọn dẹp sơ đồ bàn để hôm sau bán tiếp"
+          >
+            ☕ Chốt Báo Cáo Ngày
           </button>
         )}
       </div>
 
       {subTab === 'reports' ? (
         /* REPORTS SECTION */
-        <div className="space-y-6">
+        <div className="space-y-5">
+          {/* Lọc thời gian báo cáo */}
+          <div className="flex items-center gap-1.5 bg-gray-200/60 p-1.5 rounded-2xl w-full sm:w-max">
+            <button
+              onClick={() => setReportFilter('day')}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-black transition ${
+                reportFilter === 'day' ? 'bg-white text-coffee-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              📅 Hôm Nay
+            </button>
+            <button
+              onClick={() => setReportFilter('week')}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-black transition ${
+                reportFilter === 'week' ? 'bg-white text-coffee-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              🗓️ Tuần Này
+            </button>
+            <button
+              onClick={() => setReportFilter('month')}
+              className={`flex-1 sm:flex-initial px-4 py-2 rounded-xl text-xs font-black transition ${
+                reportFilter === 'month' ? 'bg-white text-coffee-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              📆 Tháng Này
+            </button>
+          </div>
+
           {/* Key Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-5 bg-gradient-to-br from-coffee-900 to-coffee-800 text-white rounded-2xl shadow-sm space-y-2">
               <div className="flex items-center justify-between text-coffee-200">
-                <span className="text-xs font-bold uppercase">Doanh thu hôm nay</span>
+                <span className="text-xs font-bold uppercase">
+                  Doanh thu {reportFilter === 'day' ? 'hôm nay' : reportFilter === 'week' ? 'tuần này' : 'tháng này'}
+                </span>
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
               </div>
               <div className="text-2xl font-extrabold text-amber-200">
-                {(dashboardData?.todayRevenue || 0).toLocaleString('vi-VN')} đ
+                {(reportFilter === 'day' 
+                  ? (dashboardData?.todayRevenue || 0)
+                  : reportFilter === 'week'
+                  ? (dashboardData?.weekRevenue || 0)
+                  : (dashboardData?.monthRevenue || 0)
+                ).toLocaleString('vi-VN')} đ
               </div>
               <p className="text-[11px] text-coffee-300">Tổng doanh thu các đơn đã thanh toán</p>
             </div>
 
             <div className="p-5 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-2">
               <div className="flex items-center justify-between text-gray-500">
-                <span className="text-xs font-bold uppercase">Đơn hàng hôm nay</span>
+                <span className="text-xs font-bold uppercase">
+                  Đơn hàng {reportFilter === 'day' ? 'hôm nay' : reportFilter === 'week' ? 'tuần này' : 'tháng này'}
+                </span>
                 <ShoppingBag className="w-5 h-5 text-amber-600" />
               </div>
               <div className="text-2xl font-extrabold text-gray-900">
-                {dashboardData?.todayOrders || 0} đơn
+                {reportFilter === 'day' 
+                  ? (dashboardData?.todayOrders || 0)
+                  : reportFilter === 'week'
+                  ? (dashboardData?.weekOrders || 0)
+                  : (dashboardData?.monthOrders || 0)
+                } đơn
               </div>
-              <p className="text-[11px] text-gray-400">Số đơn hoàn tất trong ngày</p>
+              <p className="text-[11px] text-gray-400">Số đơn hoàn tất tương ứng</p>
             </div>
 
             <div className="p-5 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-2">
@@ -254,7 +335,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                         </div>
                       </div>
                       <span className="font-bold text-xs text-coffee-800">
-                        {item.totalSales.toLocaleString('vi-VN')} đ
+                        {(item.totalSales || 0).toLocaleString('vi-VN')} đ
                       </span>
                     </div>
                   ))
@@ -277,6 +358,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                       <th className="p-2.5">Tổng Tiền</th>
                       <th className="p-2.5">Hình Thức</th>
                       <th className="p-2.5">Trạng Thái</th>
+                      <th className="p-2.5 text-right">Dọn rác</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -308,6 +390,15 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                               ? 'Đã Hủy'
                               : 'Chờ Phục Vụ'}
                           </span>
+                        </td>
+                        <td className="p-2.5 text-right">
+                          <button
+                            onClick={() => handleDeleteOrder(ord.id)}
+                            className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            title="Xóa vĩnh viễn hóa đơn này khỏi lịch sử"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -394,7 +485,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                           </span>
                         </td>
                         <td className="p-3 font-extrabold text-coffee-800">
-                          {item.price.toLocaleString('vi-VN')} đ
+                          {(item.price || 0).toLocaleString('vi-VN')} đ
                         </td>
                         <td className="p-3">
                           <button
@@ -480,7 +571,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                           </span>
                         </td>
                         <td className="p-3 font-bold text-gray-500">
-                          {item.price.toLocaleString('vi-VN')} đ
+                          {(item.price || 0).toLocaleString('vi-VN')} đ
                         </td>
                         <td className="p-3 text-right">
                           <button
