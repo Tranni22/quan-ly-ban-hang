@@ -516,9 +516,9 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       {/* Khung giỏ hàng & Thanh toán bên phải (Cols 5/12) - Trên mobile trượt lên dạng slide-over */}
       <div
         id="cart-section"
-        className={`lg:col-span-5 flex flex-col h-full bg-white border border-gray-100 shadow-xs overflow-hidden rounded-2xl transition-all duration-300 ${
+        className={`lg:col-span-5 flex-col h-full bg-white border border-gray-100 shadow-xs overflow-hidden rounded-2xl transition-all duration-300 ${
           isCartOpenMobile
-            ? 'fixed inset-0 z-50 flex'
+            ? 'fixed inset-0 z-50 flex flex-col h-[100dvh] w-full'
             : 'hidden lg:flex'
         }`}
       >
