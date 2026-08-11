@@ -1,15 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import { SkeletonTableGrid } from './SkeletonLoader';
 import { Users, Plus, CreditCard, RefreshCw, Coffee, AlertCircle, Clock } from 'lucide-react';
 
 export default function TableMap({ onSelectTable, onCheckoutTable }) {
-  const [tables, setTables] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const cachedData = apiService.getCachedTables()?.data;
+  const [tables, setTables] = useState(cachedData || []);
+  const [loading, setLoading] = useState(!cachedData || cachedData.length === 0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedArea, setSelectedArea] = useState('ALL');
   const [error, setError] = useState('');
 
-  const loadTables = async () => {
-    setLoading(true);
+  const loadTables = async (isBackground = false) => {
+    if (!isBackground) {
+      if (tables.length === 0) setLoading(true);
+      else setIsRefreshing(true);
+    }
     try {
       const res = await apiService.getTables();
       if (res.success) {
@@ -19,12 +25,13 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
       setError('Lỗi tải danh sách bàn!');
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
     }
   };
 
   useEffect(() => {
-    loadTables();
-    const interval = setInterval(loadTables, 5000); // Auto refresh mỗi 5s
+    loadTables(tables.length > 0);
+    const interval = setInterval(() => loadTables(true), 5000); // Polling ngầm mỗi 5s
     return () => clearInterval(interval);
   }, []);
 
@@ -59,11 +66,11 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
           </div>
 
           <button
-            onClick={loadTables}
+            onClick={() => loadTables(false)}
             title="Tải lại sơ đồ"
             className="p-2 hover:bg-gray-100 rounded-xl text-gray-600 transition"
           >
-            <RefreshCw className={`w-5 h-5 ${loading ? 'animate-spin' : ''}`} />
+            <RefreshCw className={`w-5 h-5 ${isRefreshing || loading ? 'animate-spin text-coffee-600' : ''}`} />
           </button>
         </div>
       </div>
@@ -87,7 +94,7 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
 
       {/* Tables Grid */}
       {loading && tables.length === 0 ? (
-        <div className="p-12 text-center text-gray-400">Đang tải danh sách bàn...</div>
+        <SkeletonTableGrid count={12} />
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2.5 sm:gap-4">
           {filteredTables.map((table) => {
@@ -126,7 +133,7 @@ export default function TableMap({ onSelectTable, onCheckoutTable }) {
 
                   {isServing && order && (
                     <div className="mt-1.5 inline-block bg-amber-200/60 px-2 py-1 rounded-lg text-amber-900 font-extrabold text-xs">
-                      {order.totalAmount.toLocaleString('vi-VN')} đ
+                      {(order?.totalAmount || 0).toLocaleString('vi-VN')} đ
                     </div>
                   )}
                 </div>

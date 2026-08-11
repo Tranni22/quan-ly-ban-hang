@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { apiService } from '../services/api';
+import { SkeletonMenuGrid } from './SkeletonLoader';
 import {
   Search,
   Plus,
@@ -25,7 +26,7 @@ const MenuItemCard = memo(function MenuItemCard({ item, onAddToCart }) {
     if (!item?.isAvailable) return;
     onAddToCart(item);
     setAdded(true);
-    setTimeout(() => setAdded(false), 500);
+    setTimeout(() => setAdded(false), 400);
   }, [item, onAddToCart]);
 
   const priceFormatted = (item?.price || 0).toLocaleString('vi-VN');
@@ -33,8 +34,8 @@ const MenuItemCard = memo(function MenuItemCard({ item, onAddToCart }) {
   return (
     <div
       onClick={handleClick}
-      className={`group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-all duration-200 cursor-pointer flex flex-col justify-between select-none active:scale-[0.98] ${
-        !item?.isAvailable ? 'opacity-50 pointer-events-none' : 'hover:border-coffee-500 hover:-translate-y-0.5'
+      className={`group relative bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-2xs hover:shadow-md transition-transform duration-100 ease-out cursor-pointer flex flex-col justify-between select-none active:scale-[0.96] touch-manipulation ${
+        !item?.isAvailable ? 'opacity-50 pointer-events-none' : 'hover:border-coffee-500'
       }`}
     >
       <div className="relative h-28 w-full bg-gray-100 overflow-hidden">
@@ -42,6 +43,9 @@ const MenuItemCard = memo(function MenuItemCard({ item, onAddToCart }) {
           src={item?.image || 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400'}
           alt={item?.name || 'Món ăn'}
           loading="lazy"
+          decoding="async"
+          width="200"
+          height="112"
           onError={(e) => {
             e.target.onerror = null;
             e.target.src = 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?w=400';
@@ -171,11 +175,14 @@ const CartItemRow = memo(function CartItemRow({
 });
 
 export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTable }) {
-  const [menu, setMenu] = useState([]);
-  const [categories, setCategories] = useState([]);
+  const cachedMenuData = apiService.getCachedMenu();
+  const cachedTablesData = apiService.getCachedTables();
+
+  const [menu, setMenu] = useState(cachedMenuData?.allItems || []);
+  const [categories, setCategories] = useState(cachedMenuData?.categories || []);
   const [activeCategory, setActiveCategory] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
-  const [tables, setTables] = useState([]);
+  const [tables, setTables] = useState(cachedTablesData?.data || []);
 
   // Cart / Order State
   const [cart, setCart] = useState([]);
@@ -183,13 +190,15 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   const [orderNote, setOrderNote] = useState('');
   const [currentOrderId, setCurrentOrderId] = useState(null);
 
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(!cachedMenuData);
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState('');
 
   // Tải Menu & Tables
-  const loadData = useCallback(async () => {
-    setLoading(true);
+  const loadData = useCallback(async (isBackground = false) => {
+    if (!isBackground && menu.length === 0) {
+      setLoading(true);
+    }
     try {
       const [menuRes, tablesRes] = await Promise.all([
         apiService.getMenu(),
@@ -210,10 +219,10 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     } finally {
       setLoading(false);
     }
-  }, [setSelectedTable]);
+  }, [menu.length, setSelectedTable]);
 
   useEffect(() => {
-    loadData();
+    loadData(menu.length > 0);
   }, []);
 
   // Tải Order của bàn đang được chọn
@@ -466,12 +475,8 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
 
         {/* Lưới các món ăn */}
         <div className="flex-1 p-4 overflow-y-auto">
-          {loading ? (
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3.5 animate-pulse">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
-                <div key={i} className="h-44 bg-gray-100 rounded-2xl" />
-              ))}
-            </div>
+          {loading && menu.length === 0 ? (
+            <SkeletonMenuGrid count={6} />
           ) : filteredMenu.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">Không tìm thấy món phù hợp</div>
           ) : (

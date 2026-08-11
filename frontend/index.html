@@ -3,7 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☕</text></svg>" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="theme-color" content="#4f2d25" />
     <title>Coffee POS - Quản Lý Quán Cà Phê</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -35,23 +39,38 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
+      * {
+        -webkit-tap-highlight-color: transparent !important;
+        touch-action: manipulation;
+      }
       body {
         font-family: 'Be Vietnam Pro', sans-serif;
+        overscroll-behavior-y: none;
+        -webkit-font-smoothing: antialiased;
+        text-rendering: optimizeLegibility;
       }
-      /* Custom Scrollbar */
+      /* Tối ưu cuộn mượt cho Android */
+      .overflow-y-auto, .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: contain;
+      }
+      /* Chống Android Chrome tự động Zoom gây giật lag khi gõ input */
+      @media (max-width: 768px) {
+        input, select, textarea {
+          font-size: 16px !important;
+        }
+      }
+      /* Custom Scrollbar nhẹ hơn cho mobile */
       ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
+        width: 4px;
+        height: 4px;
       }
       ::-webkit-scrollbar-track {
-        background: #f1f1f1;
+        background: transparent;
       }
       ::-webkit-scrollbar-thumb {
-        background: #c2a397;
-        border-radius: 4px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #8c5344;
+        background: #d0a293;
+        border-radius: 99px;
       }
       @media print {
         .no-print {

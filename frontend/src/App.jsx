@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import LoginModal from './components/LoginModal';
@@ -8,6 +8,7 @@ import CheckoutModal from './components/CheckoutModal';
 import ReceiptInvoice from './components/ReceiptInvoice';
 import AdminDashboard from './components/AdminDashboard';
 import TableDesigner from './components/TableDesigner';
+import AppSplashScreen from './components/AppSplashScreen';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -55,6 +56,7 @@ class ErrorBoundary extends React.Component {
 function MainApp() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('tables'); // 'tables', 'pos', 'menu', 'dashboard'
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Selection states
   const [selectedTable, setSelectedTable] = useState(null);
@@ -63,6 +65,18 @@ function MainApp() {
   const [checkoutOrder, setCheckoutOrder] = useState(null);
   const [checkoutTable, setCheckoutTable] = useState(null);
   const [paidReceiptData, setPaidReceiptData] = useState(null);
+
+  useEffect(() => {
+    // Ứng dụng khởi tạo mượt trong 500ms để đảm bảo UI mượt mà tuyệt đối
+    const timer = setTimeout(() => {
+      setIsInitializing(false);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (isInitializing) {
+    return <AppSplashScreen text="Đang chuẩn bị dữ liệu mượt mà..." />;
+  }
 
   if (!user) {
     return <LoginModal />;

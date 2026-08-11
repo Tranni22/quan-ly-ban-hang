@@ -1,5 +1,23 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
+// Cache helpers cho giao diện hiển thị 0ms instant load
+export function getLocalCache(key) {
+  try {
+    const item = localStorage.getItem(`coffee_cache_${key}`);
+    return item ? JSON.parse(item) : null;
+  } catch (e) {
+    return null;
+  }
+}
+
+export function setLocalCache(key, data) {
+  try {
+    localStorage.setItem(`coffee_cache_${key}`, JSON.stringify(data));
+  } catch (e) {
+    console.warn('Cannot write cache', e);
+  }
+}
+
 export async function fetchApi(endpoint, options = {}) {
   const token = localStorage.getItem('coffee_pos_token');
   
@@ -39,14 +57,32 @@ export const apiService = {
   getMe: () => fetchApi('/auth/me'),
 
   // Categories & Menu
-  getCategories: () => fetchApi('/categories'),
-  getMenu: () => fetchApi('/menu'),
+  getCategories: async () => {
+    const res = await fetchApi('/categories');
+    if (res?.success) setLocalCache('categories', res);
+    return res;
+  },
+  getCachedCategories: () => getLocalCache('categories'),
+
+  getMenu: async () => {
+    const res = await fetchApi('/menu');
+    if (res?.success) setLocalCache('menu', res);
+    return res;
+  },
+  getCachedMenu: () => getLocalCache('menu'),
+
   createMenuItem: (item) => fetchApi('/menu', { method: 'POST', body: JSON.stringify(item) }),
   updateMenuItem: (id, item) => fetchApi(`/menu/${id}`, { method: 'PUT', body: JSON.stringify(item) }),
   deleteMenuItem: (id) => fetchApi(`/menu/${id}`, { method: 'DELETE' }),
 
   // Tables
-  getTables: () => fetchApi('/tables'),
+  getTables: async () => {
+    const res = await fetchApi('/tables');
+    if (res?.success) setLocalCache('tables', res);
+    return res;
+  },
+  getCachedTables: () => getLocalCache('tables'),
+
   createTable: (table) => fetchApi('/tables', { method: 'POST', body: JSON.stringify(table) }),
   updateTable: (id, table) => fetchApi(`/tables/${id}`, { method: 'PUT', body: JSON.stringify(table) }),
   deleteTable: (id) => fetchApi(`/tables/${id}`, { method: 'DELETE' }),
