@@ -319,7 +319,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
         </div>
       ) : (
         /* MENU MANAGEMENT SECTION */
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden p-5 space-y-4">
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-4">
           {/* Sub-tabs cho Menu active và Menu đã xóa (Recycle Bin) */}
           <div className="flex items-center gap-2 border-b border-gray-100 pb-3">
             <button

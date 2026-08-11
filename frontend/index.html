@@ -51,9 +51,13 @@
         text-rendering: optimizeLegibility;
       }
       /* Tối ưu cuộn mượt cho Android */
-      .overflow-y-auto, .overflow-x-auto {
+      .overflow-y-auto {
         -webkit-overflow-scrolling: touch;
-        overscroll-behavior: contain;
+        overscroll-behavior-y: contain;
+      }
+      .overflow-x-auto {
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior-x: contain;
       }
       /* Chống Android Chrome tự động Zoom gây giật lag khi gõ input */
       @media (max-width: 768px) {
