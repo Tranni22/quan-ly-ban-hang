@@ -193,6 +193,8 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   const [loading, setLoading] = useState(!cachedMenuData);
   const [saving, setSaving] = useState(false);
   const [notification, setNotification] = useState('');
+  const [isCartOpenMobile, setIsCartOpenMobile] = useState(false);
+  const [cartLoading, setCartLoading] = useState(false);
 
   // Tải Menu & Tables
   const loadData = useCallback(async (isBackground = false) => {
@@ -229,8 +231,15 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   useEffect(() => {
     if (!selectedTable) return;
 
+    // Reset dữ liệu giỏ hàng của bàn cũ ngay lập tức để tránh hiển thị sai lệch/race condition
+    setCurrentOrderId(null);
+    setCart([]);
+    setOrderNote('');
+    setCustomerName('Khách vãng lai');
+
     let isMounted = true;
     const loadTableOrder = async () => {
+      setCartLoading(true);
       try {
         const res = await apiService.getTableOrder(selectedTable.id);
         if (!isMounted) return;
@@ -255,6 +264,8 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         }
       } catch (err) {
         console.error('Lỗi khi tải đơn hàng bàn:', err);
+      } finally {
+        if (isMounted) setCartLoading(false);
       }
     };
 
@@ -262,11 +273,11 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     return () => {
       isMounted = false;
     };
-  }, [selectedTable]);
+  }, [selectedTable?.id]);
 
   // Handlers tối ưu bằng useCallback
   const handleAddToCart = useCallback((item) => {
-    if (!item?.id) return;
+    if (!item?.id || cartLoading) return;
     setCart((prev) => {
       const existing = prev.find((i) => i.menuItemId === item.id);
       if (existing) {
@@ -347,8 +358,10 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         }
         setNotification('Đã lưu đơn và gửi order tới Bar/Bếp thành công!');
         setTimeout(() => setNotification(''), 3000);
+        setIsCartOpenMobile(false);
         return { success: true, orderId: savedId };
       }
+      alert(res.message || 'Lưu đơn không thành công. Vui lòng thử lại!');
       return { success: false };
     } catch (err) {
       alert(err.message || 'Lỗi khi lưu đơn!');
@@ -389,6 +402,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         tableName: selectedTable?.name,
         customerName
       });
+      setIsCartOpenMobile(false);
     }
   }, [cart, handleSaveOrder, onCheckoutTable, selectedTable, currentOrderId, customerName, cartTotal]);
 
@@ -403,6 +417,15 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-100px)] pb-16 md:pb-0 relative">
+      {/* Saving Overlay chặn tương tác và tăng trải nghiệm chuyên nghiệp */}
+      {saving && (
+        <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-[1px] flex flex-col items-center justify-center select-none font-sans cursor-wait">
+          <div className="bg-coffee-900 text-white p-5 rounded-2xl shadow-xl flex items-center gap-3 border border-amber-400/20">
+            <div className="w-5 h-5 border-2 border-amber-300 border-t-transparent rounded-full animate-spin"></div>
+            <span className="text-xs font-bold tracking-wide">Đang lưu đơn gửi Bar/Bếp...</span>
+          </div>
+        </div>
+      )}
       {/* Khung thực đơn bên trái (Cols 7/12) */}
       <div className="lg:col-span-7 flex flex-col h-full bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
         {/* Thanh tìm kiếm & chọn danh mục */}
@@ -434,7 +457,8 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
               <select
                 value={selectedTable?.id || ''}
                 onChange={handleSelectTableChange}
-                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-coffee-800 outline-none focus:border-coffee-600 shadow-2xs"
+                disabled={saving}
+                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-coffee-800 outline-none focus:border-coffee-600 shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {tables.map((tbl) => (
                   <option key={tbl.id} value={tbl.id}>
@@ -489,8 +513,15 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
       </div>
 
-      {/* Khung giỏ hàng & Thanh toán bên phải (Cols 5/12) */}
-      <div id="cart-section" className="lg:col-span-5 flex flex-col h-full bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
+      {/* Khung giỏ hàng & Thanh toán bên phải (Cols 5/12) - Trên mobile trượt lên dạng slide-over */}
+      <div
+        id="cart-section"
+        className={`lg:col-span-5 flex flex-col h-full bg-white border border-gray-100 shadow-xs overflow-hidden rounded-2xl transition-all duration-300 ${
+          isCartOpenMobile
+            ? 'fixed inset-0 z-50 flex'
+            : 'hidden lg:flex'
+        }`}
+      >
         {/* Cart Header */}
         <div className="p-4 border-b border-gray-100 bg-coffee-900 text-white flex items-center justify-between">
           <div>
@@ -503,15 +534,26 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
             <p className="text-[11px] text-coffee-300 mt-1">Đơn hàng đang tạo / phục vụ</p>
           </div>
 
-          {cart.length > 0 && (
+          <div className="flex items-center gap-1">
+            {cart.length > 0 && (
+              <button
+                onClick={handleClearCart}
+                title="Xóa tất cả món trong đơn"
+                className="text-xs text-coffee-300 hover:text-red-300 p-1.5 hover:bg-coffee-800 rounded-lg transition"
+              >
+                Xóa hết
+              </button>
+            )}
+
+            {/* Nút đóng giỏ hàng chỉ hiện trên Mobile */}
             <button
-              onClick={handleClearCart}
-              title="Xóa tất cả món trong đơn"
-              className="text-xs text-coffee-300 hover:text-red-300 p-1.5 hover:bg-coffee-800 rounded-lg transition"
+              onClick={() => setIsCartOpenMobile(false)}
+              className="lg:hidden p-1.5 hover:bg-coffee-800 text-coffee-300 hover:text-white rounded-lg transition ml-1"
+              title="Đóng giỏ hàng"
             >
-              Xóa hết
+              <X className="w-5 h-5" />
             </button>
-          )}
+          </div>
         </div>
 
         {/* Thông báo thao tác */}
@@ -547,8 +589,13 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
 
         {/* Danh sách các món trong Giỏ hàng */}
-        <div className="flex-1 p-3 overflow-y-auto space-y-2.5 pb-28 sm:pb-3">
-          {cart.length === 0 ? (
+        <div className="flex-1 p-3 overflow-y-auto space-y-2.5 pb-28 sm:pb-3 relative">
+          {cartLoading ? (
+            <div className="p-8 text-center text-gray-400 flex flex-col items-center justify-center h-full animate-pulse">
+              <div className="w-8 h-8 border-2 border-coffee-800 border-t-transparent rounded-full animate-spin mb-3"></div>
+              <p className="text-xs font-semibold text-gray-500">Đang tải giỏ hàng của bàn...</p>
+            </div>
+          ) : cart.length === 0 ? (
             <div className="p-8 text-center text-gray-400 flex flex-col items-center justify-center h-full">
               <Coffee className="w-12 h-12 text-gray-200 mb-2" />
               <p className="text-sm font-medium">Chưa có món nào trong đơn</p>
@@ -588,7 +635,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
 
             <button
               onClick={handleCheckout}
-              disabled={cart.length === 0}
+              disabled={saving || cart.length === 0}
               className="py-3 bg-coffee-800 hover:bg-coffee-900 active:bg-coffee-950 text-white font-bold text-xs rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
               <CreditCard className="w-4 h-4" />
@@ -615,10 +662,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
           </div>
 
           <button
-            onClick={() => {
-              const cartElem = document.getElementById('cart-section');
-              if (cartElem) cartElem.scrollIntoView({ behavior: 'smooth' });
-            }}
+            onClick={() => setIsCartOpenMobile(true)}
             className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-coffee-950 font-black text-xs rounded-xl shadow transition"
           >
             Xem món đã chọn ↓
