@@ -297,7 +297,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         ];
       }
     });
-  }, []);
+  }, [cartLoading]);
 
   const handleUpdateQty = useCallback((menuItemId, delta) => {
     setCart((prev) =>
@@ -497,10 +497,46 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
           </div>
         </div>
 
-        {/* Lưới các món ăn */}
-        <div className="flex-1 p-4 overflow-y-auto">
+        {/* Lưới các món ăn - Hỗ trợ cuộn dọc liên tục phân nhóm danh mục cực mượt trên di động */}
+        <div className="flex-1 p-4 overflow-y-auto max-h-[calc(100vh-220px)] md:max-h-none no-scrollbar">
           {loading && menu.length === 0 ? (
             <SkeletonMenuGrid count={6} />
+          ) : activeCategory === 'ALL' ? (
+            // Hiển thị cuộn liên tiếp nhóm theo danh mục chuẩn UX cao cấp
+            (() => {
+              const term = searchTerm.trim().toLowerCase();
+              const renderedCategories = categories.map((cat) => {
+                const itemsInCat = menu.filter(
+                  (item) =>
+                    item &&
+                    item.categoryId === cat.id &&
+                    (!term || (item.name && item.name.toLowerCase().includes(term)))
+                );
+                if (itemsInCat.length === 0) return null;
+
+                return (
+                  <div key={cat.id} className="mb-6">
+                    <h3 className="text-xs font-black text-coffee-900 bg-coffee-50/80 border border-coffee-100/50 px-3 py-2 rounded-xl mb-3 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-md">
+                      <span>{cat.icon}</span>
+                      <span>{cat.name}</span>
+                      <span className="text-[10px] bg-coffee-200/50 text-coffee-800 px-1.5 py-0.5 rounded-md font-bold">
+                        {itemsInCat.length}
+                      </span>
+                    </h3>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                      {itemsInCat.map((item) => (
+                        <MenuItemCard key={item.id} item={item} onAddToCart={handleAddToCart} />
+                      ))}
+                    </div>
+                  </div>
+                );
+              }).filter(Boolean);
+
+              if (renderedCategories.length === 0) {
+                return <div className="text-center py-12 text-gray-400 text-sm">Không tìm thấy món phù hợp</div>;
+              }
+              return <div className="space-y-2">{renderedCategories}</div>;
+            })()
           ) : filteredMenu.length === 0 ? (
             <div className="text-center py-12 text-gray-400 text-sm">Không tìm thấy món phù hợp</div>
           ) : (
