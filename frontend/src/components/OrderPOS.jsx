@@ -306,7 +306,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   }, []);
 
   const handleClearCart = useCallback(() => {
-    if (cart.length > 0 && window.confirm('Bạn có chắc chắn muốn xóa hết món trong giỏ?')) {
+    if (cart.length > 0 && window.confirm('Bạn có chắc chắn muốn xóa hết các món đã chọn?')) {
       setCart([]);
     }
   }, [cart.length]);
