@@ -9,6 +9,7 @@ import ReceiptInvoice from './components/ReceiptInvoice';
 import AdminDashboard from './components/AdminDashboard';
 import TableDesigner from './components/TableDesigner';
 import AppSplashScreen from './components/AppSplashScreen';
+import { SpeedInsights } from '@vercel/speed-insights/react';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -158,6 +159,9 @@ function MainApp() {
           onClose={() => setPaidReceiptData(null)}
         />
       )}
+
+      {/* Vercel Speed Insights */}
+      <SpeedInsights />
     </div>
   );
 }
