@@ -104,5 +104,8 @@ export const apiService = {
     return res;
   },
   getCachedDashboard: () => getLocalCache('dashboard'),
-  closeDay: () => fetchApi('/reports/close-day', { method: 'POST' })
+  closeDay: () => fetchApi('/reports/close-day', { method: 'POST' }),
+  closeShift: () => fetchApi('/reports/close-shift', { method: 'POST' }),
+  closeWeek: () => fetchApi('/reports/close-week', { method: 'POST' }),
+  closeMonth: () => fetchApi('/reports/close-month', { method: 'POST' })
 };

@@ -46,16 +46,44 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
     }
   }, [activeSubTab]);
 
-  const handleCloseDay = async () => {
-    if (confirm('BẠN CÓ CHẮC CHẮN MUỐN CHỐT BÁO CÁO NGÀY?\n\nHành động này sẽ:\n1. Đưa tất cả sơ đồ bàn về trạng thái Trống (EMPTY)\n2. Hủy các đơn hàng đang treo chưa trả tiền để làm sạch dữ liệu ca cũ.\n\nSẵn sàng để quán bắt đầu bán tiếp ca mới mượt mà!')) {
+  const handleCloseShift = async () => {
+    if (confirm(`BẠN CÓ CHẮC CHẮN MUỐN CHỐT ${dashboardData?.currentShiftName || 'CA HIỆN TẠI'}?\n\nHành động này sẽ:\n1. Lưu lịch sử doanh thu ca hiện tại.\n2. Reset doanh thu ca về 0 để ca mới sẵn sàng bán tiếp.\n3. Dọn sơ đồ bàn về trạng thái Trống (EMPTY).`)) {
       try {
-        const res = await apiService.closeDay();
+        const res = await apiService.closeShift();
         if (res.success) {
           alert(res.message);
           loadDashboardData(true);
         }
       } catch (err) {
-        alert(err.message || 'Lỗi khi chốt ca bán hàng!');
+        alert(err.message || 'Lỗi khi chốt ca!');
+      }
+    }
+  };
+
+  const handleCloseWeek = async () => {
+    if (confirm(`BẠN CÓ CHẮC CHẮN MUỐN CHỐT BÁO CÁO TUẦN NÀY?\n(${dashboardData?.currentWeekRange || ''})\n\nHành động này sẽ tổng kết doanh thu tuần chuẩn 7 ngày và lưu vào Lịch Sử Báo Cáo Tuần.`)) {
+      try {
+        const res = await apiService.closeWeek();
+        if (res.success) {
+          alert(res.message);
+          loadDashboardData(true);
+        }
+      } catch (err) {
+        alert(err.message || 'Lỗi khi chốt tuần!');
+      }
+    }
+  };
+
+  const handleCloseMonth = async () => {
+    if (confirm(`BẠN CÓ CHẮC CHẮN MUỐN CHỐT BÁO CÁO THÁNG NÀY?\n(${dashboardData?.currentMonthRange || ''})\n\nHành động này sẽ tổng kết doanh thu tháng chuẩn (28-31 ngày) và lưu vào Lịch Sử Báo Cáo Tháng.`)) {
+      try {
+        const res = await apiService.closeMonth();
+        if (res.success) {
+          alert(res.message);
+          loadDashboardData(true);
+        }
+      } catch (err) {
+        alert(err.message || 'Lỗi khi chốt tháng!');
       }
     }
   };
@@ -224,14 +252,34 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
         )}
 
         {subTab === 'reports' && (
-          <button
-            onClick={handleCloseDay}
-            className="px-4 py-2 bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 w-full sm:w-auto border border-red-500/20"
-            title="Chốt ca hiện tại và reset doanh thu cho ca mới"
-          >
-            <RotateCcw className="w-4 h-4" />
-            <span>Chốt {dashboardData?.currentShiftName || 'Ca Bán Hàng'}</span>
-          </button>
+          <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button
+              onClick={handleCloseShift}
+              className="flex-1 sm:flex-initial px-3.5 py-2 bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 border border-red-500/20"
+              title="Chốt ca làm việc hiện tại và reset doanh thu ca về 0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" />
+              <span>Chốt {dashboardData?.currentShiftName || 'Ca'}</span>
+            </button>
+
+            <button
+              onClick={handleCloseWeek}
+              className="flex-1 sm:flex-initial px-3.5 py-2 bg-purple-700 hover:bg-purple-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 border border-purple-500/20"
+              title="Chốt tổng kết báo cáo tuần này (chuẩn 7 ngày)"
+            >
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Chốt Tuần Này</span>
+            </button>
+
+            <button
+              onClick={handleCloseMonth}
+              className="flex-1 sm:flex-initial px-3.5 py-2 bg-emerald-700 hover:bg-emerald-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 border border-emerald-500/20"
+              title="Chốt tổng kết báo cáo tháng này (chuẩn 28-31 ngày)"
+            >
+              <BarChart2 className="w-3.5 h-3.5" />
+              <span>Chốt Tháng Này</span>
+            </button>
+          </div>
         )}
       </div>
 
@@ -271,7 +319,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
             <div className="p-5 bg-gradient-to-br from-coffee-900 to-coffee-800 text-white rounded-2xl shadow-sm space-y-2">
               <div className="flex items-center justify-between text-coffee-200">
                 <span className="text-xs font-bold uppercase">
-                  Doanh thu {reportFilter === 'day' ? 'hôm nay' : reportFilter === 'week' ? 'tuần này' : 'tháng này'}
+                  Doanh thu {reportFilter === 'day' ? `(${dashboardData?.currentShiftName || 'Ca hiện tại'})` : reportFilter === 'week' ? 'tuần này' : 'tháng này'}
                 </span>
                 <TrendingUp className="w-5 h-5 text-emerald-400" />
               </div>
@@ -283,7 +331,13 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                   : (dashboardData?.monthRevenue || 0)
                 ).toLocaleString('vi-VN')} đ
               </div>
-              <p className="text-[11px] text-coffee-300">Tổng doanh thu các đơn đã thanh toán</p>
+              <p className="text-[11px] text-coffee-300">
+                {reportFilter === 'day'
+                  ? `Tiến độ: Đã chốt ${dashboardData?.shiftsToday || 0}/3 ca trong ngày`
+                  : reportFilter === 'week'
+                  ? `Khung tuần chuẩn 7 ngày: ${dashboardData?.currentWeekRange || ''}`
+                  : `Khung tháng chuẩn: ${dashboardData?.currentMonthRange || ''}`}
+              </p>
             </div>
 
             <div className="p-5 bg-white border border-gray-200 rounded-2xl shadow-sm space-y-2">
