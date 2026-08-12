@@ -650,6 +650,36 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
       SELECT * FROM daily_reports ORDER BY id DESC LIMIT 30
     `).all();
 
+    // 8. Lịch sử báo cáo tổng kết theo Tuần (Weekly Reports History)
+    const weeklyReportsHistory = db.prepare(`
+      SELECT 
+        strftime('Tuần %W (%Y)', paidAt) as periodLabel,
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(finalAmount), 0) as totalRevenue,
+        MIN(date(paidAt)) as startDate,
+        MAX(date(paidAt)) as endDate
+      FROM orders
+      WHERE status IN ('PAID', 'CLOSED') AND paidAt IS NOT NULL
+      GROUP BY strftime('%Y-W%W', paidAt)
+      ORDER BY strftime('%Y-W%W', paidAt) DESC
+      LIMIT 20
+    `).all();
+
+    // 9. Lịch sử báo cáo tổng kết theo Tháng (Monthly Reports History)
+    const monthlyReportsHistory = db.prepare(`
+      SELECT 
+        strftime('Tháng %m/%Y', paidAt) as periodLabel,
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(finalAmount), 0) as totalRevenue,
+        MIN(date(paidAt)) as startDate,
+        MAX(date(paidAt)) as endDate
+      FROM orders
+      WHERE status IN ('PAID', 'CLOSED') AND paidAt IS NOT NULL
+      GROUP BY strftime('%Y-%m', paidAt)
+      ORDER BY strftime('%Y-%m', paidAt) DESC
+      LIMIT 20
+    `).all();
+
     return res.json({
       success: true,
       data: {
@@ -668,7 +698,9 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
         recent7Days,
         recentOrders,
         shiftReportsHistory,
-        dailyReportsHistory
+        dailyReportsHistory,
+        weeklyReportsHistory,
+        monthlyReportsHistory
       }
     });
   } catch (error) {

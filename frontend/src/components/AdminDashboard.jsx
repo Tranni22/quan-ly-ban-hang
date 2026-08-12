@@ -432,32 +432,52 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
             </div>
           </div>
 
-          {/* Shift & Daily Reports History Section */}
+          {/* Shift, Daily, Weekly & Monthly Reports History Section */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 border-b border-gray-100 pb-3">
               <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-                📋 Lịch Sử Báo Cáo Doanh Thu
+                📋 Lịch Sử Báo Cáo Doanh Thu Tổng Kết
               </h3>
-              <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+              <div className="flex items-center gap-1 overflow-x-auto bg-gray-100 p-1 rounded-xl no-scrollbar">
                 <button
                   onClick={() => setHistoryType('shift')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
                     historyType === 'shift'
                       ? 'bg-coffee-800 text-amber-200 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  ☕ Theo Ca Bán Hàng ({dashboardData?.shiftReportsHistory?.length || 0})
+                  ☕ Theo Ca ({dashboardData?.shiftReportsHistory?.length || 0})
                 </button>
                 <button
                   onClick={() => setHistoryType('daily')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
                     historyType === 'daily'
                       ? 'bg-coffee-800 text-amber-200 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
                   📅 Theo Ngày ({dashboardData?.dailyReportsHistory?.length || 0})
+                </button>
+                <button
+                  onClick={() => setHistoryType('weekly')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                    historyType === 'weekly'
+                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  🗓️ Theo Tuần ({dashboardData?.weeklyReportsHistory?.length || 0})
+                </button>
+                <button
+                  onClick={() => setHistoryType('monthly')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                    historyType === 'monthly'
+                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  📆 Theo Tháng ({dashboardData?.monthlyReportsHistory?.length || 0})
                 </button>
               </div>
             </div>
@@ -466,19 +486,18 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-100">
                   <tr>
-                    <th className="p-2.5">Ngày Chốt</th>
-                    <th className="p-2.5">{historyType === 'shift' ? 'Ca Bán Hàng' : 'Loại Báo Cáo'}</th>
+                    <th className="p-2.5">Mốc Thời Gian / Chu Kỳ</th>
+                    <th className="p-2.5">Phân Loại</th>
                     <th className="p-2.5">Tổng Số Đơn</th>
                     <th className="p-2.5">Tổng Doanh Thu</th>
-                    <th className="p-2.5">Người Chốt</th>
-                    <th className="p-2.5 text-right">Thời Gian Chốt</th>
+                    <th className="p-2.5 text-right">Khoảng Ngày Chi Tiết</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {historyType === 'shift' ? (
+                  {historyType === 'shift' && (
                     dashboardData?.shiftReportsHistory?.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="p-4 text-center text-gray-400">
+                        <td colSpan="5" className="p-4 text-center text-gray-400">
                           Chưa có lịch sử chốt ca nào. Hãy bấm "Chốt Ca" khi kết thúc ca làm việc!
                         </td>
                       </tr>
@@ -495,16 +514,17 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                           <td className="p-2.5 font-bold text-emerald-700">
                             {rep.totalRevenue.toLocaleString('vi-VN')} đ
                           </td>
-                          <td className="p-2.5 text-gray-600 font-medium">{rep.closedBy || 'Admin'}</td>
-                          <td className="p-2.5 text-right text-gray-400 text-[11px]">{rep.closedAt}</td>
+                          <td className="p-2.5 text-right text-gray-400 text-[11px]">Chốt bởi: {rep.closedBy || 'Admin'} ({rep.closedAt})</td>
                         </tr>
                       ))
                     )
-                  ) : (
+                  )}
+
+                  {historyType === 'daily' && (
                     dashboardData?.dailyReportsHistory?.length === 0 ? (
                       <tr>
-                        <td colSpan="6" className="p-4 text-center text-gray-400">
-                          Chưa có lịch sử chốt báo cáo ngày nào.
+                        <td colSpan="5" className="p-4 text-center text-gray-400">
+                          Chưa có lịch sử chốt ngày nào.
                         </td>
                       </tr>
                     ) : (
@@ -513,15 +533,70 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                           <td className="p-2.5 font-bold text-gray-900">{rep.reportDate}</td>
                           <td className="p-2.5">
                             <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 font-extrabold text-[10px]">
-                               Báo Cáo Ngày (Trọn vẹn)
+                              Báo Cáo Ngày (Trọn vẹn)
                             </span>
                           </td>
                           <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
                           <td className="p-2.5 font-bold text-emerald-700">
                             {rep.totalRevenue.toLocaleString('vi-VN')} đ
                           </td>
-                          <td className="p-2.5 text-gray-600 font-medium">Hệ thống</td>
                           <td className="p-2.5 text-right text-gray-400 text-[11px]">{rep.closedAt}</td>
+                        </tr>
+                      ))
+                    )
+                  )}
+
+                  {historyType === 'weekly' && (
+                    dashboardData?.weeklyReportsHistory?.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="p-4 text-center text-gray-400">
+                          Chưa có dữ liệu báo cáo tuần nào.
+                        </td>
+                      </tr>
+                    ) : (
+                      dashboardData?.weeklyReportsHistory?.map((rep, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/80 transition">
+                          <td className="p-2.5 font-bold text-gray-900">{rep.periodLabel}</td>
+                          <td className="p-2.5">
+                            <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 font-extrabold text-[10px]">
+                              Tổng Kết Tuần
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
+                          <td className="p-2.5 font-bold text-emerald-700">
+                            {rep.totalRevenue.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="p-2.5 text-right text-gray-500 font-medium text-[11px]">
+                            Từ {rep.startDate} đến {rep.endDate}
+                          </td>
+                        </tr>
+                      ))
+                    )
+                  )}
+
+                  {historyType === 'monthly' && (
+                    dashboardData?.monthlyReportsHistory?.length === 0 ? (
+                      <tr>
+                        <td colSpan="5" className="p-4 text-center text-gray-400">
+                          Chưa có dữ liệu báo cáo tháng nào.
+                        </td>
+                      </tr>
+                    ) : (
+                      dashboardData?.monthlyReportsHistory?.map((rep, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/80 transition">
+                          <td className="p-2.5 font-bold text-gray-900">{rep.periodLabel}</td>
+                          <td className="p-2.5">
+                            <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
+                              Tổng Kết Tháng
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
+                          <td className="p-2.5 font-bold text-emerald-700">
+                            {rep.totalRevenue.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="p-2.5 text-right text-gray-500 font-medium text-[11px]">
+                            Từ {rep.startDate} đến {rep.endDate}
+                          </td>
                         </tr>
                       ))
                     )
