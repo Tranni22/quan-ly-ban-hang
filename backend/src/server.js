@@ -566,7 +566,17 @@ app.get('/api/orders/:id/receipt', authenticateToken, (req, res) => {
 // --- DASHBOARD & REPORTS ROUTES ---
 app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
   try {
-    // 1. Thống kê hôm nay (Chỉ tính các đơn status = 'PAID' chưa chốt)
+    // 0. Đếm số ca đã chốt trong ngày hôm nay
+    const shiftsToday = db.prepare(`
+      SELECT COUNT(*) as count FROM shift_reports 
+      WHERE reportDate = date('now', 'localtime')
+    `).get().count;
+
+    const currentShiftNum = (shiftsToday % 3) + 1;
+    const shiftNames = { 1: 'Ca 1 (Sáng)', 2: 'Ca 2 (Chiều)', 3: 'Ca 3 (Tối)' };
+    const currentShiftName = shiftNames[currentShiftNum];
+
+    // 1. Thống kê ca hiện tại (Chỉ tính các đơn status = 'PAID' chưa chốt ca)
     const todaySales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
@@ -575,7 +585,7 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
       WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
     `).get();
 
-    // 1b. Thống kê tuần này (Tính từ các đơn PAID hoặc CLOSED trong tuần hiện tại)
+    // 1b. Thống kê tuần này (Tính từ các đơn PAID hoặc CLOSED trong tuần hiện tại - Tự động reset theo Tuần)
     const weekSales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
@@ -586,7 +596,7 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
         AND strftime('%W', paidAt) = strftime('%W', 'now')
     `).get();
 
-    // 1c. Thống kê tháng này (Tính từ các đơn PAID hoặc CLOSED trong tháng hiện tại)
+    // 1c. Thống kê tháng này (Tính từ các đơn PAID hoặc CLOSED trong tháng hiện tại - Tự động reset theo Tháng)
     const monthSales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
@@ -630,7 +640,12 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
       SELECT * FROM orders ORDER BY id DESC LIMIT 20
     `).all();
 
-    // 6. Lịch sử báo cáo đã chốt (Daily Reports History)
+    // 6. Lịch sử chốt ca (Shift Reports History)
+    const shiftReportsHistory = db.prepare(`
+      SELECT * FROM shift_reports ORDER BY id DESC LIMIT 30
+    `).all();
+
+    // 7. Lịch sử báo cáo ngày đã chốt (Daily Reports History)
     const dailyReportsHistory = db.prepare(`
       SELECT * FROM daily_reports ORDER BY id DESC LIMIT 30
     `).all();
@@ -638,6 +653,9 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
     return res.json({
       success: true,
       data: {
+        shiftsToday,
+        currentShiftNum,
+        currentShiftName,
         todayRevenue: todaySales.totalRevenue,
         todayOrders: todaySales.totalOrders,
         weekRevenue: weekSales.totalRevenue,
@@ -649,6 +667,7 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
         topItems,
         recent7Days,
         recentOrders,
+        shiftReportsHistory,
         dailyReportsHistory
       }
     });
@@ -658,11 +677,24 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
   }
 });
 
-// Chốt ca / Chốt báo cáo ngày để dọn bàn, reset doanh thu ngày về 0 và lưu lịch sử vào daily_reports
+// Chốt ca / Báo cáo ca (Mặc định 3 Ca/Ngày: Ca 1 - Sáng, Ca 2 - Chiều, Ca 3 - Tối)
 app.post('/api/reports/close-day', authenticateToken, requireAdmin, (req, res) => {
   try {
-    // 1. Lấy tổng kết các đơn PAID trong ngày hôm nay trước khi chốt
-    const todaySummary = db.prepare(`
+    const reportDate = new Date().toISOString().split('T')[0];
+    const staffName = req.user?.fullName || 'Admin';
+
+    // 1. Đếm số ca đã chốt hôm nay
+    const shiftsToday = db.prepare(`
+      SELECT COUNT(*) as count FROM shift_reports 
+      WHERE reportDate = date('now', 'localtime')
+    `).get().count;
+
+    const shiftNum = (shiftsToday % 3) + 1;
+    const shiftNames = { 1: 'Ca 1 (Sáng)', 2: 'Ca 2 (Chiều)', 3: 'Ca 3 (Tối & Chốt Ngày)' };
+    const shiftName = shiftNames[shiftNum];
+
+    // 2. Lấy tổng số đơn và doanh thu các đơn 'PAID' chưa chốt hiện tại
+    const shiftSummary = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
         COALESCE(SUM(finalAmount), 0) as totalRevenue
@@ -670,36 +702,55 @@ app.post('/api/reports/close-day', authenticateToken, requireAdmin, (req, res) =
       WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
     `).get();
 
-    const reportDate = new Date().toISOString().split('T')[0];
+    // 3. Lưu bản ghi vào bảng shift_reports
+    db.prepare(`
+      INSERT INTO shift_reports (reportDate, shiftNumber, shiftName, totalOrders, totalRevenue, closedBy, closedAt)
+      VALUES (date('now', 'localtime'), ?, ?, ?, ?, ?, datetime('now', 'localtime'))
+    `).run(shiftNum, shiftName, shiftSummary.totalOrders, shiftSummary.totalRevenue, staffName);
 
-    // 2. Lưu vào bảng lịch sử daily_reports (nếu có doanh thu hoặc đơn hàng)
-    if (todaySummary.totalOrders > 0) {
-      db.prepare(`
-        INSERT INTO daily_reports (reportDate, totalOrders, totalRevenue, closedAt)
-        VALUES (?, ?, ?, datetime('now', 'localtime'))
-      `).run(reportDate, todaySummary.totalOrders, todaySummary.totalRevenue);
-    }
-
-    // 3. Chuyển trạng thái các đơn PAID hôm nay thành CLOSED để reset doanh thu "Hôm nay" về 0
+    // 4. Chuyển trạng thái các đơn 'PAID' vừa chốt ca thành 'CLOSED' để reset ca mới về 0
     db.prepare(`
       UPDATE orders 
       SET status = 'CLOSED' 
       WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
     `).run();
 
-    // 4. Chuyển trạng thái tất cả bàn về trống (EMPTY)
+    // 5. Nếu đây là Ca 3 (hoặc đã chốt đủ 3 ca trong ngày) -> Tự động chốt Báo Cáo Ngày vào daily_reports
+    let isFullDayClosed = false;
+    if (shiftNum === 3 || shiftsToday >= 2) {
+      isFullDayClosed = true;
+      const fullDaySummary = db.prepare(`
+        SELECT 
+          SUM(totalOrders) as totalOrders,
+          SUM(totalRevenue) as totalRevenue
+        FROM shift_reports 
+        WHERE reportDate = date('now', 'localtime')
+      `).get();
+
+      db.prepare(`
+        INSERT INTO daily_reports (reportDate, totalOrders, totalRevenue, closedAt)
+        VALUES (date('now', 'localtime'), ?, ?, datetime('now', 'localtime'))
+      `).run(fullDaySummary.totalOrders || 0, fullDaySummary.totalRevenue || 0);
+    }
+
+    // 6. Chuyển tất cả bàn về trống (EMPTY)
     db.prepare("UPDATE tables SET status = 'EMPTY'").run();
 
-    // 5. Hủy các đơn hàng đang treo 'PENDING' để dọn sạch rác
+    // 7. Hủy các đơn 'PENDING' rác
     db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE status = 'PENDING'").run();
+
+    let successMsg = `☕ ĐÃ CHỐT THÀNH CÔNG: ${shiftName}!\n• Doanh thu ca: ${(shiftSummary.totalRevenue || 0).toLocaleString('vi-VN')} đ (${shiftSummary.totalOrders || 0} đơn)\n• Doanh thu ca đã được reset về 0 để sẵn sàng cho ca tiếp theo.`;
+    if (isFullDayClosed) {
+      successMsg += `\n\n🎉 HOÀN TẤT BÁO CÁO NGÀY (${reportDate})!\nĐã chốt trọn vẹn 3/3 ca trong ngày và lưu vào Lịch Sử Báo Cáo Ngày. Ngày mai ca 1 sẵn sàng!`;
+    }
 
     return res.json({ 
       success: true, 
-      message: `Chốt báo cáo ngày ${reportDate} thành công!\n- Đã lưu lịch sử doanh thu: ${todaySummary.totalRevenue.toLocaleString('vi-VN')} đ (${todaySummary.totalOrders} đơn)\n- Doanh thu hôm nay đã được reset về 0 để sẵn sàng bán tiếp.\n- Toàn bộ bàn đã được dọn trống.` 
+      message: successMsg
     });
   } catch (error) {
-    console.error('Close day error:', error);
-    return res.status(500).json({ success: false, message: 'Lỗi khi chốt ngày!' });
+    console.error('Close shift error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi khi chốt ca báo cáo!' });
   }
 });
 

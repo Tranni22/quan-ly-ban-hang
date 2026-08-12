@@ -20,6 +20,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
   const [subTab, setSubTab] = useState(activeSubTab); // 'reports' or 'menu'
   const [menuTab, setMenuTab] = useState('active'); // 'active' or 'deleted'
   const [reportFilter, setReportFilter] = useState('day'); // 'day', 'week', 'month'
+  const [historyType, setHistoryType] = useState('shift'); // 'shift' or 'daily'
   const [dashboardData, setDashboardData] = useState(null);
   const [menu, setMenu] = useState([]);
   const [categories, setCategories] = useState([]);
@@ -226,9 +227,10 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
           <button
             onClick={handleCloseDay}
             className="px-4 py-2 bg-red-700 hover:bg-red-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow transition flex items-center justify-center gap-1.5 w-full sm:w-auto border border-red-500/20"
-            title="Chốt ca / Dọn dẹp sơ đồ bàn để hôm sau bán tiếp"
+            title="Chốt ca hiện tại và reset doanh thu cho ca mới"
           >
-            ☕ Chốt Báo Cáo Ngày
+            <RotateCcw className="w-4 h-4" />
+            <span>Chốt {dashboardData?.currentShiftName || 'Ca Bán Hàng'}</span>
           </button>
         )}
       </div>
@@ -430,39 +432,99 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
             </div>
           </div>
 
-          {/* Daily Reports History Section */}
+          {/* Shift & Daily Reports History Section */}
           <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-            <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
-              📅 Lịch Sử Báo Cáo Doanh Thu Đã Chốt (Theo Ngày)
-            </h3>
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+              <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                📋 Lịch Sử Báo Cáo Doanh Thu
+              </h3>
+              <div className="flex items-center gap-1.5 bg-gray-100 p-1 rounded-xl">
+                <button
+                  onClick={() => setHistoryType('shift')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    historyType === 'shift'
+                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  ☕ Theo Ca Bán Hàng ({dashboardData?.shiftReportsHistory?.length || 0})
+                </button>
+                <button
+                  onClick={() => setHistoryType('daily')}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                    historyType === 'daily'
+                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  📅 Theo Ngày ({dashboardData?.dailyReportsHistory?.length || 0})
+                </button>
+              </div>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-100">
                   <tr>
                     <th className="p-2.5">Ngày Chốt</th>
+                    <th className="p-2.5">{historyType === 'shift' ? 'Ca Bán Hàng' : 'Loại Báo Cáo'}</th>
                     <th className="p-2.5">Tổng Số Đơn</th>
                     <th className="p-2.5">Tổng Doanh Thu</th>
+                    <th className="p-2.5">Người Chốt</th>
                     <th className="p-2.5 text-right">Thời Gian Chốt</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {dashboardData?.dailyReportsHistory?.length === 0 ? (
-                    <tr>
-                      <td colSpan="4" className="p-4 text-center text-gray-400">
-                        Chưa có lịch sử chốt báo cáo ngày nào. Hãy bấm "Chốt Báo Cáo Ngày" khi kết thúc ca/ngày bán hàng!
-                      </td>
-                    </tr>
-                  ) : (
-                    dashboardData?.dailyReportsHistory?.map((rep) => (
-                      <tr key={rep.id} className="hover:bg-gray-50/80 transition">
-                        <td className="p-2.5 font-bold text-gray-900">{rep.reportDate}</td>
-                        <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
-                        <td className="p-2.5 font-bold text-emerald-700">
-                          {rep.totalRevenue.toLocaleString('vi-VN')} đ
+                  {historyType === 'shift' ? (
+                    dashboardData?.shiftReportsHistory?.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="p-4 text-center text-gray-400">
+                          Chưa có lịch sử chốt ca nào. Hãy bấm "Chốt Ca" khi kết thúc ca làm việc!
                         </td>
-                        <td className="p-2.5 text-right text-gray-400 text-[11px]">{rep.closedAt}</td>
                       </tr>
-                    ))
+                    ) : (
+                      dashboardData?.shiftReportsHistory?.map((rep) => (
+                        <tr key={rep.id} className="hover:bg-gray-50/80 transition">
+                          <td className="p-2.5 font-bold text-gray-900">{rep.reportDate}</td>
+                          <td className="p-2.5">
+                            <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 font-extrabold text-[10px]">
+                              {rep.shiftName}
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
+                          <td className="p-2.5 font-bold text-emerald-700">
+                            {rep.totalRevenue.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="p-2.5 text-gray-600 font-medium">{rep.closedBy || 'Admin'}</td>
+                          <td className="p-2.5 text-right text-gray-400 text-[11px]">{rep.closedAt}</td>
+                        </tr>
+                      ))
+                    )
+                  ) : (
+                    dashboardData?.dailyReportsHistory?.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="p-4 text-center text-gray-400">
+                          Chưa có lịch sử chốt báo cáo ngày nào.
+                        </td>
+                      </tr>
+                    ) : (
+                      dashboardData?.dailyReportsHistory?.map((rep) => (
+                        <tr key={rep.id} className="hover:bg-gray-50/80 transition">
+                          <td className="p-2.5 font-bold text-gray-900">{rep.reportDate}</td>
+                          <td className="p-2.5">
+                            <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 font-extrabold text-[10px]">
+                               Báo Cáo Ngày (Trọn vẹn)
+                            </span>
+                          </td>
+                          <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
+                          <td className="p-2.5 font-bold text-emerald-700">
+                            {rep.totalRevenue.toLocaleString('vi-VN')} đ
+                          </td>
+                          <td className="p-2.5 text-gray-600 font-medium">Hệ thống</td>
+                          <td className="p-2.5 text-right text-gray-400 text-[11px]">{rep.closedAt}</td>
+                        </tr>
+                      ))
+                    )
                   )}
                 </tbody>
               </table>
