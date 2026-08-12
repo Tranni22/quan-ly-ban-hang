@@ -429,6 +429,45 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
               </div>
             </div>
           </div>
+
+          {/* Daily Reports History Section */}
+          <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+            <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+              📅 Lịch Sử Báo Cáo Doanh Thu Đã Chốt (Theo Ngày)
+            </h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-bold border-b border-gray-100">
+                  <tr>
+                    <th className="p-2.5">Ngày Chốt</th>
+                    <th className="p-2.5">Tổng Số Đơn</th>
+                    <th className="p-2.5">Tổng Doanh Thu</th>
+                    <th className="p-2.5 text-right">Thời Gian Chốt</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {dashboardData?.dailyReportsHistory?.length === 0 ? (
+                    <tr>
+                      <td colSpan="4" className="p-4 text-center text-gray-400">
+                        Chưa có lịch sử chốt báo cáo ngày nào. Hãy bấm "Chốt Báo Cáo Ngày" khi kết thúc ca/ngày bán hàng!
+                      </td>
+                    </tr>
+                  ) : (
+                    dashboardData?.dailyReportsHistory?.map((rep) => (
+                      <tr key={rep.id} className="hover:bg-gray-50/80 transition">
+                        <td className="p-2.5 font-bold text-gray-900">{rep.reportDate}</td>
+                        <td className="p-2.5 font-medium">{rep.totalOrders} đơn</td>
+                        <td className="p-2.5 font-bold text-emerald-700">
+                          {rep.totalRevenue.toLocaleString('vi-VN')} đ
+                        </td>
+                        <td className="p-2.5 text-right text-gray-400 text-[11px]">{rep.closedAt}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </div>
       ) : (
         /* MENU MANAGEMENT SECTION */

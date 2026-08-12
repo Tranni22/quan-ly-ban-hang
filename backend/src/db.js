@@ -97,6 +97,16 @@ export function initDatabase() {
         FOREIGN KEY (orderId) REFERENCES orders(id) ON DELETE CASCADE
       );
     `);
+
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS daily_reports (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        reportDate TEXT NOT NULL,
+        totalOrders INTEGER DEFAULT 0,
+        totalRevenue REAL DEFAULT 0,
+        closedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
   } catch (e) {
     console.log('Lỗi tạo bảng (được bỏ qua nếu dùng Memory Adapter):', e.message);
   }

@@ -566,7 +566,7 @@ app.get('/api/orders/:id/receipt', authenticateToken, (req, res) => {
 // --- DASHBOARD & REPORTS ROUTES ---
 app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
   try {
-    // 1. Thống kê hôm nay
+    // 1. Thống kê hôm nay (Chỉ tính các đơn status = 'PAID' chưa chốt)
     const todaySales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
@@ -575,24 +575,24 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
       WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
     `).get();
 
-    // 1b. Thống kê tuần này (Tính từ Thứ 2 đến Chủ nhật của tuần hiện tại)
+    // 1b. Thống kê tuần này (Tính từ các đơn PAID hoặc CLOSED trong tuần hiện tại)
     const weekSales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
         COALESCE(SUM(finalAmount), 0) as totalRevenue
       FROM orders 
-      WHERE status = 'PAID' 
+      WHERE status IN ('PAID', 'CLOSED') 
         AND strftime('%Y', paidAt) = strftime('%Y', 'now')
         AND strftime('%W', paidAt) = strftime('%W', 'now')
     `).get();
 
-    // 1c. Thống kê tháng này
+    // 1c. Thống kê tháng này (Tính từ các đơn PAID hoặc CLOSED trong tháng hiện tại)
     const monthSales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
         COALESCE(SUM(finalAmount), 0) as totalRevenue
       FROM orders 
-      WHERE status = 'PAID' 
+      WHERE status IN ('PAID', 'CLOSED') 
         AND strftime('%Y', paidAt) = strftime('%Y', 'now')
         AND strftime('%m', paidAt) = strftime('%m', 'now')
     `).get();
@@ -601,12 +601,12 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
     const servingTables = db.prepare("SELECT COUNT(*) as count FROM tables WHERE status = 'SERVING'").get().count;
     const totalTables = db.prepare("SELECT COUNT(*) as count FROM tables").get().count;
 
-    // 3. Top 5 món bán chạy nhất
+    // 3. Top 5 món bán chạy nhất (từ đơn PAID và CLOSED)
     const topItems = db.prepare(`
       SELECT itemName, SUM(quantity) as totalQty, SUM(totalPrice) as totalSales
       FROM order_items oi
       JOIN orders o ON oi.orderId = o.id
-      WHERE o.status = 'PAID'
+      WHERE o.status IN ('PAID', 'CLOSED')
       GROUP BY itemName
       ORDER BY totalQty DESC
       LIMIT 5
@@ -619,7 +619,7 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
         COUNT(*) as orderCount,
         COALESCE(SUM(finalAmount), 0) as revenue
       FROM orders
-      WHERE status = 'PAID'
+      WHERE status IN ('PAID', 'CLOSED')
       GROUP BY date(paidAt)
       ORDER BY date DESC
       LIMIT 7
@@ -628,6 +628,11 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
     // 5. Danh sách đơn hàng vừa thanh toán gần đây
     const recentOrders = db.prepare(`
       SELECT * FROM orders ORDER BY id DESC LIMIT 20
+    `).all();
+
+    // 6. Lịch sử báo cáo đã chốt (Daily Reports History)
+    const dailyReportsHistory = db.prepare(`
+      SELECT * FROM daily_reports ORDER BY id DESC LIMIT 30
     `).all();
 
     return res.json({
@@ -643,7 +648,8 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
         totalTables,
         topItems,
         recent7Days,
-        recentOrders
+        recentOrders,
+        dailyReportsHistory
       }
     });
   } catch (error) {
@@ -652,17 +658,44 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
   }
 });
 
-// Chốt ca / Chốt báo cáo ngày để dọn bàn, sẵn sàng bán tiếp ngày hôm sau
+// Chốt ca / Chốt báo cáo ngày để dọn bàn, reset doanh thu ngày về 0 và lưu lịch sử vào daily_reports
 app.post('/api/reports/close-day', authenticateToken, requireAdmin, (req, res) => {
   try {
-    // 1. Chuyển trạng thái tất cả bàn về trống (EMPTY)
+    // 1. Lấy tổng kết các đơn PAID trong ngày hôm nay trước khi chốt
+    const todaySummary = db.prepare(`
+      SELECT 
+        COUNT(*) as totalOrders,
+        COALESCE(SUM(finalAmount), 0) as totalRevenue
+      FROM orders 
+      WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
+    `).get();
+
+    const reportDate = new Date().toISOString().split('T')[0];
+
+    // 2. Lưu vào bảng lịch sử daily_reports (nếu có doanh thu hoặc đơn hàng)
+    if (todaySummary.totalOrders > 0) {
+      db.prepare(`
+        INSERT INTO daily_reports (reportDate, totalOrders, totalRevenue, closedAt)
+        VALUES (?, ?, ?, datetime('now', 'localtime'))
+      `).run(reportDate, todaySummary.totalOrders, todaySummary.totalRevenue);
+    }
+
+    // 3. Chuyển trạng thái các đơn PAID hôm nay thành CLOSED để reset doanh thu "Hôm nay" về 0
+    db.prepare(`
+      UPDATE orders 
+      SET status = 'CLOSED' 
+      WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
+    `).run();
+
+    // 4. Chuyển trạng thái tất cả bàn về trống (EMPTY)
     db.prepare("UPDATE tables SET status = 'EMPTY'").run();
-    // 2. Hủy các đơn hàng đang treo 'PENDING' để dọn sạch rác
+
+    // 5. Hủy các đơn hàng đang treo 'PENDING' để dọn sạch rác
     db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE status = 'PENDING'").run();
-    
+
     return res.json({ 
       success: true, 
-      message: 'Chốt báo cáo ngày thành công! Toàn bộ sơ đồ bàn đã được dọn sạch về trạng thái trống để ngày mai sẵn sàng bán tiếp.' 
+      message: `Chốt báo cáo ngày ${reportDate} thành công!\n- Đã lưu lịch sử doanh thu: ${todaySummary.totalRevenue.toLocaleString('vi-VN')} đ (${todaySummary.totalOrders} đơn)\n- Doanh thu hôm nay đã được reset về 0 để sẵn sàng bán tiếp.\n- Toàn bộ bàn đã được dọn trống.` 
     });
   } catch (error) {
     console.error('Close day error:', error);
