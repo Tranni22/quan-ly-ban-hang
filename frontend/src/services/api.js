@@ -98,6 +98,11 @@ export const apiService = {
   getReceipt: (orderId) => fetchApi(`/orders/${orderId}/receipt`),
 
   // Dashboard Reports
-  getDashboard: () => fetchApi('/reports/dashboard'),
+  getDashboard: async () => {
+    const res = await fetchApi('/reports/dashboard');
+    if (res?.success) setLocalCache('dashboard', res);
+    return res;
+  },
+  getCachedDashboard: () => getLocalCache('dashboard'),
   closeDay: () => fetchApi('/reports/close-day', { method: 'POST' })
 };

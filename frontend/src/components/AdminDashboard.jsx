@@ -38,13 +38,20 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
     isAvailable: true
   });
 
+  // Sync subTab with activeSubTab prop changes
+  useEffect(() => {
+    if (activeSubTab) {
+      setSubTab(activeSubTab);
+    }
+  }, [activeSubTab]);
+
   const handleCloseDay = async () => {
     if (confirm('BẠN CÓ CHẮC CHẮN MUỐN CHỐT BÁO CÁO NGÀY?\n\nHành động này sẽ:\n1. Đưa tất cả sơ đồ bàn về trạng thái Trống (EMPTY)\n2. Hủy các đơn hàng đang treo chưa trả tiền để làm sạch dữ liệu ca cũ.\n\nSẵn sàng để quán bắt đầu bán tiếp ca mới mượt mà!')) {
       try {
         const res = await apiService.closeDay();
         if (res.success) {
           alert(res.message);
-          loadDashboardData();
+          loadDashboardData(true);
         }
       } catch (err) {
         alert(err.message || 'Lỗi khi chốt ca bán hàng!');
@@ -58,7 +65,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
         const res = await apiService.deleteOrder(id);
         if (res.success) {
           alert(res.message);
-          loadDashboardData();
+          loadDashboardData(true);
         }
       } catch (err) {
         alert(err.message || 'Lỗi khi xóa hóa đơn!');
@@ -66,8 +73,23 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
     }
   };
 
-  const loadDashboardData = async () => {
-    setLoading(true);
+  // Stale-While-Revalidate (SWR) pattern: load instant from cache, refresh in background
+  const loadDashboardData = async (forceReload = false) => {
+    const cachedDash = apiService.getCachedDashboard();
+    const cachedMenu = apiService.getCachedMenu();
+    let hasCache = false;
+
+    if (cachedDash && cachedMenu && !forceReload) {
+      setDashboardData(cachedDash.data);
+      setCategories(cachedMenu.categories);
+      setMenu(cachedMenu.allItems);
+      setDeletedItems(cachedMenu.deletedItems || []);
+      setLoading(false);
+      hasCache = true;
+    } else {
+      setLoading(true);
+    }
+
     try {
       const [dashRes, menuRes] = await Promise.all([
         apiService.getDashboard(),

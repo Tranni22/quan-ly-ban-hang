@@ -110,26 +110,32 @@ function MainApp() {
       <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
 
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
-        {activeTab === 'tables' && (
+        <div className={activeTab === 'tables' ? 'block' : 'hidden'}>
           <TableMap
             onSelectTable={handleSelectTableFromMap}
             onCheckoutTable={handleCheckoutTable}
           />
-        )}
+        </div>
 
-        {activeTab === 'pos' && (
+        <div className={activeTab === 'pos' ? 'block' : 'hidden'}>
           <OrderPOS
             selectedTable={selectedTable}
             setSelectedTable={setSelectedTable}
             onCheckoutTable={handleCheckoutTable}
           />
-        )}
+        </div>
 
-        {activeTab === 'table-designer' && <TableDesigner />}
+        <div className={activeTab === 'table-designer' ? 'block' : 'hidden'}>
+          <TableDesigner />
+        </div>
 
-        {activeTab === 'menu' && <AdminDashboard activeSubTab="menu" />}
+        <div className={activeTab === 'menu' ? 'block' : 'hidden'}>
+          <AdminDashboard activeSubTab="menu" />
+        </div>
 
-        {activeTab === 'dashboard' && <AdminDashboard activeSubTab="reports" />}
+        <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
+          <AdminDashboard activeSubTab="reports" />
+        </div>
       </main>
 
       {/* Checkout Modal */}
