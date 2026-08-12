@@ -196,6 +196,10 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   const [isCartOpenMobile, setIsCartOpenMobile] = useState(false);
   const [cartLoading, setCartLoading] = useState(false);
 
+  // Trạng thái modal xác nhận chống ấn nhầm cho nhân viên
+  const [showConfirmSendModal, setShowConfirmSendModal] = useState(false);
+  const [showConfirmCheckoutModal, setShowConfirmCheckoutModal] = useState(false);
+
   // Tải Menu & Tables
   const loadData = useCallback(async (isBackground = false) => {
     if (!isBackground && menu.length === 0) {
@@ -387,11 +391,37 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     return cart.reduce((sum, item) => sum + (item?.price || 0) * (item?.quantity || 1), 0);
   }, [cart]);
 
-  const handleCheckout = useCallback(async () => {
+  const handleOpenSendModal = useCallback(() => {
+    if (!selectedTable) {
+      alert('Vui lòng chọn bàn trước!');
+      return;
+    }
+    if (cart.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 món!');
+      return;
+    }
+    setShowConfirmSendModal(true);
+  }, [selectedTable, cart.length]);
+
+  const handleOpenCheckoutModal = useCallback(() => {
+    if (!selectedTable) {
+      alert('Vui lòng chọn bàn trước!');
+      return;
+    }
     if (cart.length === 0) {
       alert('Vui lòng chọn món trước!');
       return;
     }
+    setShowConfirmCheckoutModal(true);
+  }, [selectedTable, cart.length]);
+
+  const handleConfirmSend = useCallback(async () => {
+    setShowConfirmSendModal(false);
+    await handleSaveOrder();
+  }, [handleSaveOrder]);
+
+  const handleConfirmCheckout = useCallback(async () => {
+    setShowConfirmCheckoutModal(false);
     const saveRes = await handleSaveOrder();
     if (saveRes.success && onCheckoutTable) {
       const targetOrderId = saveRes.orderId || currentOrderId;
@@ -404,7 +434,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       });
       setIsCartOpenMobile(false);
     }
-  }, [cart, handleSaveOrder, onCheckoutTable, selectedTable, currentOrderId, customerName, cartTotal]);
+  }, [handleSaveOrder, onCheckoutTable, currentOrderId, selectedTable, cartTotal, cart, customerName]);
 
   const handleSelectTableChange = useCallback(
     (e) => {
@@ -661,7 +691,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
 
           <div className="grid grid-cols-2 gap-2">
             <button
-              onClick={handleSaveOrder}
+              onClick={handleOpenSendModal}
               disabled={saving || cart.length === 0}
               className="py-3 bg-amber-600 hover:bg-amber-700 active:bg-amber-800 text-white font-bold text-xs rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
@@ -670,7 +700,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
             </button>
 
             <button
-              onClick={handleCheckout}
+              onClick={handleOpenCheckoutModal}
               disabled={saving || cart.length === 0}
               className="py-3 bg-coffee-800 hover:bg-coffee-900 active:bg-coffee-950 text-white font-bold text-xs rounded-xl shadow-xs transition duration-150 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-1.5 cursor-pointer disabled:cursor-not-allowed"
             >
@@ -680,6 +710,100 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
           </div>
         </div>
       </div>
+
+      {/* Modal Xác Nhận Gửi Bếp (Chống ấn nhầm) */}
+      {showConfirmSendModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-100 text-amber-800 rounded-2xl">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base">Xác Nhận Gửi Đơn Bar/Bếp</h3>
+                <p className="text-xs text-gray-500">Kiểm tra lại thông tin trước khi gửi xuống quầy</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-gray-50 rounded-2xl space-y-2 text-xs">
+              <div className="flex justify-between font-bold text-gray-800">
+                <span>Bàn phục vụ:</span>
+                <span className="text-coffee-800">{selectedTable?.name} ({selectedTable?.area})</span>
+              </div>
+              <div className="flex justify-between font-bold text-gray-800">
+                <span>Khách hàng:</span>
+                <span>{customerName}</span>
+              </div>
+              <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-2">
+                <span>Tổng món & tiền:</span>
+                <span className="text-amber-700">{cart.reduce((s, i) => s + i.quantity, 0)} món — {cartTotal.toLocaleString('vi-VN')} đ</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setShowConfirmSendModal(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy / Kiểm tra lại
+              </button>
+              <button
+                onClick={handleConfirmSend}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" /> Xác Nhận Gửi Bếp
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Xác Nhận Thanh Toán (Chống ấn nhầm) */}
+      {showConfirmCheckoutModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-coffee-100 text-coffee-800 rounded-2xl">
+                <CreditCard className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base">Xác Nhận Thanh Toán Bàn</h3>
+                <p className="text-xs text-gray-500">Chuyển sang màn hình thu ngân thanh toán</p>
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-gray-50 rounded-2xl space-y-2 text-xs">
+              <div className="flex justify-between font-bold text-gray-800">
+                <span>Bàn thanh toán:</span>
+                <span className="text-coffee-800">{selectedTable?.name} ({selectedTable?.area})</span>
+              </div>
+              <div className="flex justify-between font-bold text-gray-800">
+                <span>Khách hàng:</span>
+                <span>{customerName}</span>
+              </div>
+              <div className="flex justify-between font-bold text-gray-800 border-t border-gray-200 pt-2">
+                <span>Tổng tiền thanh toán:</span>
+                <span className="text-coffee-900 text-base">{cartTotal.toLocaleString('vi-VN')} đ</span>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setShowConfirmCheckoutModal(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+              >
+                Hủy / Xem lại
+              </button>
+              <button
+                onClick={handleConfirmCheckout}
+                className="flex-1 py-3 bg-coffee-800 hover:bg-coffee-900 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5"
+              >
+                <Check className="w-4 h-4" /> Xác Nhận Thanh Toán
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Floating Cart Button cho Mobile khi có món trong giỏ */}
       {cart.length > 0 && (
