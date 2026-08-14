@@ -15,7 +15,9 @@ import {
   AlertCircle,
   FileText,
   Check,
-  ShoppingBag
+  ShoppingBag,
+  ArrowRightLeft,
+  GitMerge
 } from 'lucide-react';
 
 // Thẻ món ăn trong thực đơn - Đã bọc React.memo để tránh re-render khi giỏ hàng thay đổi
@@ -199,6 +201,13 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   // Trạng thái modal xác nhận chống ấn nhầm cho nhân viên
   const [showConfirmSendModal, setShowConfirmSendModal] = useState(false);
   const [showConfirmCheckoutModal, setShowConfirmCheckoutModal] = useState(false);
+
+  // Trạng thái modal chuyển bàn & gộp bàn
+  const [showTransferModal, setShowTransferModal] = useState(false);
+  const [showMergeModal, setShowMergeModal] = useState(false);
+  const [targetTransferTableId, setTargetTransferTableId] = useState('');
+  const [targetMergeTableId, setTargetMergeTableId] = useState('');
+  const [transferring, setTransferring] = useState(false);
 
   // Tải Menu & Tables
   const loadData = useCallback(async (isBackground = false) => {
@@ -445,6 +454,54 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     [tables, setSelectedTable]
   );
 
+  const handleTransferTable = async () => {
+    if (!selectedTable?.id || !targetTransferTableId) return;
+    setTransferring(true);
+    try {
+      const res = await apiService.transferTable(selectedTable.id, Number(targetTransferTableId));
+      if (res.success) {
+        setNotification(`✅ ${res.message}`);
+        setTimeout(() => setNotification(''), 3500);
+        setShowTransferModal(false);
+        // Tải lại danh sách bàn & chuyển qua bàn đích
+        const tablesRes = await apiService.getTables();
+        if (tablesRes.success) {
+          setTables(tablesRes.data || []);
+          const destTbl = tablesRes.data?.find((t) => t.id === Number(targetTransferTableId));
+          if (destTbl) setSelectedTable(destTbl);
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'Lỗi khi chuyển bàn!');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
+  const handleMergeTable = async () => {
+    if (!selectedTable?.id || !targetMergeTableId) return;
+    setTransferring(true);
+    try {
+      const res = await apiService.mergeTable(selectedTable.id, Number(targetMergeTableId));
+      if (res.success) {
+        setNotification(`✅ ${res.message}`);
+        setTimeout(() => setNotification(''), 3500);
+        setShowMergeModal(false);
+        // Tải lại danh sách bàn & chuyển qua bàn đích
+        const tablesRes = await apiService.getTables();
+        if (tablesRes.success) {
+          setTables(tablesRes.data || []);
+          const destTbl = tablesRes.data?.find((t) => t.id === Number(targetMergeTableId));
+          if (destTbl) setSelectedTable(destTbl);
+        }
+      }
+    } catch (err) {
+      alert(err.message || 'Lỗi khi gộp bàn!');
+    } finally {
+      setTransferring(false);
+    }
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-100px)] pb-16 md:pb-0 relative">
       {/* Saving Overlay chặn tương tác và tăng trải nghiệm chuyên nghiệp */}
@@ -487,15 +544,50 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
               <select
                 value={selectedTable?.id || ''}
                 onChange={handleSelectTableChange}
-                disabled={saving}
+                disabled={saving || transferring}
                 className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-coffee-800 outline-none focus:border-coffee-600 shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {tables.map((tbl) => (
                   <option key={tbl.id} value={tbl.id}>
-                    {tbl.name} ({tbl.area})
+                    {tbl.name} ({tbl.area}) - {tbl.status === 'SERVING' ? '🟡 Có khách' : '🟢 Trống'}
                   </option>
                 ))}
               </select>
+
+              {/* Nút Chuyển bàn & Gộp bàn */}
+              {selectedTable && (
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const emptyTables = tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable.id);
+                      if (emptyTables.length > 0) setTargetTransferTableId(String(emptyTables[0].id));
+                      setShowTransferModal(true);
+                    }}
+                    disabled={saving || transferring}
+                    title="Chuyển toàn bộ đơn sang bàn trống khác"
+                    className="px-2.5 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs active:scale-95"
+                  >
+                    <ArrowRightLeft className="w-3.5 h-3.5 text-amber-700" />
+                    <span className="hidden sm:inline">Chuyển bàn</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const servingTables = tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable.id);
+                      if (servingTables.length > 0) setTargetMergeTableId(String(servingTables[0].id));
+                      setShowMergeModal(true);
+                    }}
+                    disabled={saving || transferring}
+                    title="Gộp đơn của bàn này vào một bàn đang phục vụ khác"
+                    className="px-2.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs active:scale-95"
+                  >
+                    <GitMerge className="w-3.5 h-3.5 text-indigo-700" />
+                    <span className="hidden sm:inline">Gộp bàn</span>
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -827,6 +919,108 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
           >
             Xem món đã chọn ↓
           </button>
+        </div>
+      )}
+
+      {/* Modal Chuyển Bàn */}
+      {showTransferModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-amber-50 text-amber-900 rounded-2xl border border-amber-200">
+                <ArrowRightLeft className="w-6 h-6 text-amber-700" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base">Chuyển Bàn POS</h3>
+                <p className="text-xs text-gray-500">Chuyển toàn bộ món từ {selectedTable?.name} sang bàn trống</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-600 block">Chọn bàn trống đích:</label>
+              <select
+                value={targetTransferTableId}
+                onChange={(e) => setTargetTransferTableId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-xs outline-none"
+              >
+                {tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable?.id).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.area}) - {t.seats} Ghế
+                  </option>
+                ))}
+                {tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable?.id).length === 0 && (
+                  <option value="">-- Không có bàn trống nào --</option>
+                )}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setShowTransferModal(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+              >
+                Đóng / Hủy
+              </button>
+              <button
+                onClick={handleTransferTable}
+                disabled={transferring || !targetTransferTableId}
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {transferring ? 'Đang chuyển...' : 'Xác Nhận Chuyển'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Gộp Bàn */}
+      {showMergeModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="p-3 bg-indigo-50 text-indigo-950 rounded-2xl border border-indigo-200">
+                <GitMerge className="w-6 h-6 text-indigo-700" />
+              </div>
+              <div>
+                <h3 className="font-extrabold text-gray-900 text-base">Gộp Bàn POS</h3>
+                <p className="text-xs text-gray-500">Gộp tất cả món từ {selectedTable?.name} vào bàn đang phục vụ khác</p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-bold text-gray-600 block">Chọn bàn gộp đích (Bàn đang phục vụ):</label>
+              <select
+                value={targetMergeTableId}
+                onChange={(e) => setTargetMergeTableId(e.target.value)}
+                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-xs outline-none"
+              >
+                {tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable?.id).map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name} ({t.area}) - Đơn hiện có
+                  </option>
+                ))}
+                {tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable?.id).length === 0 && (
+                  <option value="">-- Không có bàn SERVING khác --</option>
+                )}
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 pt-2">
+              <button
+                onClick={() => setShowMergeModal(false)}
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+              >
+                Đóng / Hủy
+              </button>
+              <button
+                onClick={handleMergeTable}
+                disabled={transferring || !targetMergeTableId}
+                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+              >
+                {transferring ? 'Đang gộp...' : 'Xác Nhận Gộp Bàn'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

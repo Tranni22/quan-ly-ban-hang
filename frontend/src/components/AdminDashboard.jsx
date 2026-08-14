@@ -91,7 +91,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
   const handleDeleteOrder = async (id) => {
     if (confirm('Bạn có chắc chắn muốn xóa vĩnh viễn hóa đơn này khỏi lịch sử hệ thống để dọn bớt dữ liệu rác?')) {
       try {
-        const res = await apiService.deleteOrder(id);
+        const res = await apiService.permanentDeleteOrder(id);
         if (res.success) {
           alert(res.message);
           loadDashboardData(true);
@@ -333,10 +333,10 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
               </div>
               <p className="text-[11px] text-coffee-300">
                 {reportFilter === 'day'
-                  ? `Tiến độ: Đã chốt ${dashboardData?.shiftsToday || 0}/3 ca trong ngày`
+                  ? `⚡ Đã chốt ${dashboardData?.shiftsToday || 0}/3 ca (Doanh thu ca sẽ về 0đ sau khi Chốt Ca)`
                   : reportFilter === 'week'
-                  ? `Khung tuần chuẩn 7 ngày: ${dashboardData?.currentWeekRange || ''}`
-                  : `Khung tháng chuẩn: ${dashboardData?.currentMonthRange || ''}`}
+                  ? `🗓️ Lũy kế tuần 7 ngày: ${dashboardData?.currentWeekRange || ''} (Không reset khi chốt ca)`
+                  : `📆 Lũy kế tháng chuẩn: ${dashboardData?.currentMonthRange || ''} (Không reset khi chốt ca)`}
               </p>
             </div>
 

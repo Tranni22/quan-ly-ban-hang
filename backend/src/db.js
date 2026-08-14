@@ -1,8 +1,13 @@
 import { DatabaseSync } from 'node:sqlite';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import bcrypt from 'bcryptjs';
 
-const dbPath = path.resolve('cafe.db');
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Luôn cố định đường dẫn cafe.db chuẩn tại thư mục backend, không phụ thuộc CWD khi khởi động
+const dbPath = process.env.DB_PATH || path.join(__dirname, '../cafe.db');
 const db = new DatabaseSync(dbPath);
 
 // Enable Foreign Keys
@@ -143,6 +148,18 @@ export function initDatabase() {
         totalRevenue REAL DEFAULT 0,
         closedAt DATETIME DEFAULT CURRENT_TIMESTAMP
       );
+    `);
+
+    // Tạo các index để tăng tốc truy vấn tối đa
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
+      CREATE INDEX IF NOT EXISTS idx_orders_paidAt ON orders(paidAt);
+      CREATE INDEX IF NOT EXISTS idx_orders_tableId ON orders(tableId);
+      CREATE INDEX IF NOT EXISTS idx_orders_createdAt ON orders(createdAt);
+      CREATE INDEX IF NOT EXISTS idx_order_items_orderId ON order_items(orderId);
+      CREATE INDEX IF NOT EXISTS idx_menu_items_categoryId ON menu_items(categoryId);
+      CREATE INDEX IF NOT EXISTS idx_menu_items_isDeleted ON menu_items(isDeleted);
+      CREATE INDEX IF NOT EXISTS idx_shift_reports_reportDate ON shift_reports(reportDate);
     `);
   } catch (e) {
     console.log('Lỗi tạo bảng (được bỏ qua nếu dùng Memory Adapter):', e.message);

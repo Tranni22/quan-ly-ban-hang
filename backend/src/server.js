@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import db, { initDatabase } from './db.js';
 
-const JWT_SECRET = 'coffee_shop_pos_secret_key_2026_super_secure';
+const JWT_SECRET = process.env.JWT_SECRET || 'coffee_shop_pos_secret_key_2026_super_secure';
 const PORT = process.env.PORT || 5000;
 
 // Khởi tạo DB
@@ -168,6 +168,11 @@ app.post('/api/menu', authenticateToken, requireAdmin, (req, res) => {
     return res.status(400).json({ success: false, message: 'Vui lòng nhập đầy đủ danh mục, tên món và giá tiền!' });
   }
 
+  const numPrice = parseFloat(price);
+  if (isNaN(numPrice) || numPrice < 0) {
+    return res.status(400).json({ success: false, message: 'Giá tiền phải là số hợp lệ không âm!' });
+  }
+
   try {
     const stmt = db.prepare(`
       INSERT INTO menu_items (categoryId, name, price, description, image, isAvailable)
@@ -176,7 +181,7 @@ app.post('/api/menu', authenticateToken, requireAdmin, (req, res) => {
     const result = stmt.run(
       categoryId,
       name,
-      parseFloat(price),
+      numPrice,
       description || '',
       image || 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400',
       isAvailable !== undefined ? (isAvailable ? 1 : 0) : 1
@@ -188,13 +193,22 @@ app.post('/api/menu', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
-app.put('/api/menu/:id', authenticateToken, (req, res) => {
+app.put('/api/menu/:id', authenticateToken, requireAdmin, (req, res) => {
   const { id } = req.params;
   const { categoryId, name, price, description, image, isAvailable } = req.body;
 
   try {
     const item = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(id);
     if (!item) return res.status(404).json({ success: false, message: 'Món không tồn tại!' });
+
+    let finalPrice = item.price;
+    if (price !== undefined) {
+      const numPrice = parseFloat(price);
+      if (isNaN(numPrice) || numPrice < 0) {
+        return res.status(400).json({ success: false, message: 'Giá tiền phải là số hợp lệ không âm!' });
+      }
+      finalPrice = numPrice;
+    }
 
     const stmt = db.prepare(`
       UPDATE menu_items 
@@ -205,7 +219,7 @@ app.put('/api/menu/:id', authenticateToken, (req, res) => {
     stmt.run(
       categoryId !== undefined ? categoryId : item.categoryId,
       name !== undefined ? name : item.name,
-      price !== undefined ? parseFloat(price) : item.price,
+      finalPrice,
       description !== undefined ? description : item.description,
       image !== undefined ? image : item.image,
       isAvailable !== undefined ? (isAvailable ? 1 : 0) : item.isAvailable,
@@ -315,6 +329,157 @@ app.delete('/api/tables/:id', authenticateToken, requireAdmin, (req, res) => {
   }
 });
 
+// Chuyển bàn (Đổi bàn cho khách đang ngồi)
+app.post('/api/tables/transfer', authenticateToken, (req, res) => {
+  const { fromTableId, toTableId } = req.body;
+
+  if (!fromTableId || !toTableId) {
+    return res.status(400).json({ success: false, message: 'Vui lòng chọn đầy đủ bàn nguồn và bàn đích!' });
+  }
+
+  if (Number(fromTableId) === Number(toTableId)) {
+    return res.status(400).json({ success: false, message: 'Bàn đích phải khác bàn nguồn!' });
+  }
+
+  try {
+    const fromTable = db.prepare('SELECT * FROM tables WHERE id = ?').get(fromTableId);
+    const toTable = db.prepare('SELECT * FROM tables WHERE id = ?').get(toTableId);
+
+    if (!fromTable || !toTable) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin bàn!' });
+    }
+
+    const activeOrder = db.prepare("SELECT * FROM orders WHERE tableId = ? AND status = 'PENDING'").get(fromTableId);
+    if (!activeOrder) {
+      return res.status(400).json({ success: false, message: `Bàn ${fromTable.name} hiện không có đơn hàng nào đang phục vụ!` });
+    }
+
+    const targetOrder = db.prepare("SELECT * FROM orders WHERE tableId = ? AND status = 'PENDING'").get(toTableId);
+    if (targetOrder) {
+      return res.status(400).json({
+        success: false,
+        message: `Bàn ${toTable.name} đang có khách phục vụ! Hãy dùng tính năng 'Gộp Bàn' thay vì 'Chuyển Bàn'.`
+      });
+    }
+
+    db.exec('BEGIN TRANSACTION');
+    try {
+      // Chuyển order sang bàn mới
+      db.prepare('UPDATE orders SET tableId = ?, tableName = ? WHERE id = ?').run(toTable.id, toTable.name, activeOrder.id);
+
+      // Cập nhật trạng thái bàn cũ thành EMPTY
+      db.prepare("UPDATE tables SET status = 'EMPTY' WHERE id = ?").run(fromTable.id);
+
+      // Cập nhật trạng thái bàn mới thành SERVING
+      db.prepare("UPDATE tables SET status = 'SERVING' WHERE id = ?").run(toTable.id);
+
+      db.exec('COMMIT');
+
+      return res.json({
+        success: true,
+        message: `Đã chuyển toàn bộ hóa đơn từ ${fromTable.name} sang ${toTable.name} thành công!`
+      });
+    } catch (txErr) {
+      db.exec('ROLLBACK');
+      throw txErr;
+    }
+  } catch (error) {
+    console.error('Table transfer error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi khi chuyển bàn!' });
+  }
+});
+
+// Gộp bàn (Gộp 2 bàn đang có khách vào chung 1 hóa đơn)
+app.post('/api/tables/merge', authenticateToken, (req, res) => {
+  const { fromTableId, toTableId } = req.body;
+
+  if (!fromTableId || !toTableId) {
+    return res.status(400).json({ success: false, message: 'Vui lòng chọn bàn nguồn và bàn đích cần gộp!' });
+  }
+
+  if (Number(fromTableId) === Number(toTableId)) {
+    return res.status(400).json({ success: false, message: 'Bàn nguồn và bàn đích phải khác nhau!' });
+  }
+
+  try {
+    const fromTable = db.prepare('SELECT * FROM tables WHERE id = ?').get(fromTableId);
+    const toTable = db.prepare('SELECT * FROM tables WHERE id = ?').get(toTableId);
+
+    if (!fromTable || !toTable) {
+      return res.status(404).json({ success: false, message: 'Không tìm thấy thông tin bàn!' });
+    }
+
+    const orderFrom = db.prepare("SELECT * FROM orders WHERE tableId = ? AND status = 'PENDING'").get(fromTableId);
+    if (!orderFrom) {
+      return res.status(400).json({ success: false, message: `Bàn ${fromTable.name} không có đơn hàng nào đang phục vụ!` });
+    }
+
+    const orderTo = db.prepare("SELECT * FROM orders WHERE tableId = ? AND status = 'PENDING'").get(toTableId);
+    if (!orderTo) {
+      return res.status(400).json({
+        success: false,
+        message: `Bàn ${toTable.name} hiện đang trống! Hãy dùng tính năng 'Chuyển Bàn'.`
+      });
+    }
+
+    db.exec('BEGIN TRANSACTION');
+    try {
+      const fromItems = db.prepare('SELECT * FROM order_items WHERE orderId = ?').all(orderFrom.id);
+      const toItems = db.prepare('SELECT * FROM order_items WHERE orderId = ?').all(orderTo.id);
+
+      for (const fItem of fromItems) {
+        // Tìm xem order đích đã có món cùng loại và cùng ghi chú chưa
+        const existing = toItems.find(
+          (t) => t.menuItemId === fItem.menuItemId && (t.note || '').trim() === (fItem.note || '').trim()
+        );
+
+        if (existing) {
+          const newQty = existing.quantity + fItem.quantity;
+          const newTotal = existing.price * newQty;
+          db.prepare('UPDATE order_items SET quantity = ?, totalPrice = ? WHERE id = ?').run(newQty, newTotal, existing.id);
+          db.prepare('DELETE FROM order_items WHERE id = ?').run(fItem.id);
+          existing.quantity = newQty;
+          existing.totalPrice = newTotal;
+        } else {
+          db.prepare('UPDATE order_items SET orderId = ? WHERE id = ?').run(orderTo.id, fItem.id);
+        }
+      }
+
+      // Tính lại tổng tiền cho order đích
+      const calculatedTotal = db.prepare('SELECT COALESCE(SUM(totalPrice), 0) as total FROM order_items WHERE orderId = ?').get(orderTo.id).total;
+
+      db.prepare(`
+        UPDATE orders 
+        SET totalAmount = ?, finalAmount = ?, note = COALESCE(note, '') || CASE WHEN COALESCE(note, '') != '' THEN ' | ' ELSE '' END || 'Gộp từ ' || ?
+        WHERE id = ?
+      `).run(calculatedTotal, calculatedTotal, fromTable.name, orderTo.id);
+
+      // Đánh dấu order cũ là đã CANCELLED do gộp bàn
+      db.prepare(`
+        UPDATE orders 
+        SET status = 'CANCELLED', note = COALESCE(note, '') || ' [Đã gộp vào ' || ? || ']'
+        WHERE id = ?
+      `).run(toTable.name, orderFrom.id);
+
+      // Trả bàn cũ về EMPTY
+      db.prepare("UPDATE tables SET status = 'EMPTY' WHERE id = ?").run(fromTable.id);
+
+      db.exec('COMMIT');
+
+      return res.json({
+        success: true,
+        message: `Đã gộp toàn bộ món ăn từ ${fromTable.name} vào ${toTable.name} thành công!`
+      });
+    } catch (txErr) {
+      db.exec('ROLLBACK');
+      throw txErr;
+    }
+  } catch (error) {
+    console.error('Table merge error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi khi gộp bàn!' });
+  }
+});
+
 // --- ORDERS ROUTES ---
 app.get('/api/orders', authenticateToken, (req, res) => {
   const { status, date } = req.query;
@@ -380,9 +545,19 @@ app.post('/api/orders', authenticateToken, (req, res) => {
     return res.status(400).json({ success: false, message: 'Vui lòng chọn bàn và ít nhất 1 món!' });
   }
 
+  // Validate số lượng từng món
+  for (const item of items) {
+    const qty = parseInt(item.quantity, 10);
+    if (isNaN(qty) || qty <= 0) {
+      return res.status(400).json({ success: false, message: 'Số lượng từng món phải là số nguyên dương lớn hơn 0!' });
+    }
+  }
+
   try {
     const table = db.prepare('SELECT * FROM tables WHERE id = ?').get(tableId);
     if (!table) return res.status(404).json({ success: false, message: 'Bàn không tồn tại!' });
+
+    db.exec('BEGIN TRANSACTION');
 
     // Kiểm tra xem bàn đã có đơn PENDING chưa
     let order = db.prepare("SELECT * FROM orders WHERE tableId = ? AND status = 'PENDING'").get(tableId);
@@ -424,14 +599,15 @@ app.post('/api/orders', authenticateToken, (req, res) => {
     items.forEach(item => {
       const menuItem = db.prepare('SELECT * FROM menu_items WHERE id = ?').get(item.menuItemId);
       if (menuItem) {
-        const itemTotal = menuItem.price * item.quantity;
+        const qty = parseInt(item.quantity, 10);
+        const itemTotal = menuItem.price * qty;
         totalAmount += itemTotal;
         insertItem.run(
           orderId,
           menuItem.id,
           menuItem.name,
           menuItem.price,
-          item.quantity,
+          qty,
           item.note || '',
           itemTotal
         );
@@ -448,6 +624,8 @@ app.post('/api/orders', authenticateToken, (req, res) => {
     // Đổi trạng thái bàn sang SERVING
     db.prepare("UPDATE tables SET status = 'SERVING' WHERE id = ?").run(tableId);
 
+    db.exec('COMMIT');
+
     const updatedOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(orderId);
     const updatedItems = db.prepare('SELECT * FROM order_items WHERE orderId = ?').all(orderId);
 
@@ -460,6 +638,7 @@ app.post('/api/orders', authenticateToken, (req, res) => {
       }
     });
   } catch (error) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
     console.error('Create/update order error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi khi lưu đơn hàng!' });
   }
@@ -479,7 +658,13 @@ app.put('/api/orders/:id/pay', authenticateToken, (req, res) => {
     }
 
     const discount = parseFloat(discountPercent || 0);
+    if (isNaN(discount) || discount < 0 || discount > 100) {
+      return res.status(400).json({ success: false, message: 'Chiết khấu phải nằm trong khoảng từ 0% đến 100%!' });
+    }
+
     const finalAmount = order.totalAmount * (1 - discount / 100);
+
+    db.exec('BEGIN TRANSACTION');
 
     // Cập nhật Order status = PAID
     db.prepare(`
@@ -501,6 +686,8 @@ app.put('/api/orders/:id/pay', authenticateToken, (req, res) => {
       }
     }
 
+    db.exec('COMMIT');
+
     const paidOrder = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
     const items = db.prepare('SELECT * FROM order_items WHERE orderId = ?').all(id);
 
@@ -513,8 +700,41 @@ app.put('/api/orders/:id/pay', authenticateToken, (req, res) => {
       }
     });
   } catch (error) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
     console.error('Pay error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi khi xử lý thanh toán!' });
+  }
+});
+
+// Lấy mã VietQR động theo đơn hàng
+app.get('/api/orders/:id/vietqr', authenticateToken, (req, res) => {
+  const { id } = req.params;
+  try {
+    const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
+    if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng!' });
+
+    const finalAmount = order.finalAmount !== null && order.finalAmount !== undefined ? order.finalAmount : order.totalAmount;
+    const accountNo = '038228888';
+    const accountName = 'QUAN CAFE POS';
+    const bankCode = 'MB';
+    const memo = `Thanh toan ${order.orderCode || 'DON CAFE'}`;
+    const qrUrl = `https://img.vietqr.io/image/${bankCode}-${accountNo}-compact2.png?amount=${Math.round(finalAmount)}&addInfo=${encodeURIComponent(memo)}&accountName=${encodeURIComponent(accountName)}`;
+
+    return res.json({
+      success: true,
+      data: {
+        qrUrl,
+        finalAmount,
+        orderCode: order.orderCode,
+        accountNo,
+        accountName,
+        bankCode,
+        memo
+      }
+    });
+  } catch (error) {
+    console.error('VietQR error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi tạo mã QR thanh toán!' });
   }
 });
 
@@ -524,6 +744,10 @@ app.delete('/api/orders/:id', authenticateToken, (req, res) => {
   try {
     const order = db.prepare('SELECT * FROM orders WHERE id = ?').get(id);
     if (!order) return res.status(404).json({ success: false, message: 'Không tìm thấy đơn hàng!' });
+
+    if (order.status === 'PAID' || order.status === 'CLOSED') {
+      return res.status(400).json({ success: false, message: 'Không thể hủy đơn hàng đã thanh toán hoặc đã chốt ca!' });
+    }
 
     db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE id = ?").run(id);
 
@@ -729,6 +953,8 @@ app.post('/api/reports/close-shift', authenticateToken, requireAdmin, (req, res)
     const reportDate = new Date().toISOString().split('T')[0];
     const staffName = req.user?.fullName || 'Admin';
 
+    db.exec('BEGIN TRANSACTION');
+
     const shiftsToday = db.prepare(`
       SELECT COUNT(*) as count FROM shift_reports 
       WHERE reportDate = date('now', 'localtime')
@@ -779,11 +1005,14 @@ app.post('/api/reports/close-shift', authenticateToken, requireAdmin, (req, res)
     db.prepare("UPDATE tables SET status = 'EMPTY'").run();
     db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE status = 'PENDING'").run();
 
+    db.exec('COMMIT');
+
     return res.json({
       success: true,
       message: `⚡ ĐÃ CHỐT CA THÀNH CÔNG: ${shiftName}!\n• Doanh thu ca: ${(shiftSummary.totalRevenue || 0).toLocaleString('vi-VN')} đ (${shiftSummary.totalOrders || 0} đơn)\n• Đã lưu vào Lịch Sử Chốt Ca & Ngày.`
     });
   } catch (error) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
     console.error('Close shift error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi khi chốt ca!' });
   }
@@ -798,6 +1027,8 @@ app.post('/api/reports/close-day', authenticateToken, requireAdmin, (req, res) =
 app.post('/api/reports/close-week', authenticateToken, requireAdmin, (req, res) => {
   try {
     const weekRange = getWeekRange();
+    db.exec('BEGIN TRANSACTION');
+
     const weekSales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
@@ -814,11 +1045,14 @@ app.post('/api/reports/close-week', authenticateToken, requireAdmin, (req, res) 
       VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(weekCode, weekRange.mondayStr, weekRange.sundayStr, weekSales.totalOrders, weekSales.totalRevenue);
 
+    db.exec('COMMIT');
+
     return res.json({
       success: true,
       message: `🗓️ ĐÃ CHỐT BÁO CÁO TUẦN THÀNH CÔNG!\n• Khung thời gian chuẩn 7 ngày: ${weekRange.mondayStr} đến ${weekRange.sundayStr}\n• Tổng doanh thu tuần: ${(weekSales.totalRevenue || 0).toLocaleString('vi-VN')} đ (${weekSales.totalOrders || 0} đơn)\n• Đã lưu vào Lịch Sử Báo Cáo Tuần.`
     });
   } catch (error) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
     console.error('Close week error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi khi chốt tuần!' });
   }
@@ -828,6 +1062,8 @@ app.post('/api/reports/close-week', authenticateToken, requireAdmin, (req, res) 
 app.post('/api/reports/close-month', authenticateToken, requireAdmin, (req, res) => {
   try {
     const monthRange = getMonthRange();
+    db.exec('BEGIN TRANSACTION');
+
     const monthSales = db.prepare(`
       SELECT 
         COUNT(*) as totalOrders,
@@ -845,25 +1081,32 @@ app.post('/api/reports/close-month', authenticateToken, requireAdmin, (req, res)
       VALUES (?, ?, ?, ?, ?, datetime('now', 'localtime'))
     `).run(monthCode, monthRange.firstDayStr, monthRange.lastDayStr, monthSales.totalOrders, monthSales.totalRevenue);
 
+    db.exec('COMMIT');
+
     return res.json({
       success: true,
       message: `📆 ĐÃ CHỐT BÁO CÁO THÁNG THÀNH CÔNG!\n• Khung thời gian chuẩn tháng: ${monthRange.firstDayStr} đến ${monthRange.lastDayStr}\n• Tổng doanh thu tháng: ${(monthSales.totalRevenue || 0).toLocaleString('vi-VN')} đ (${monthSales.totalOrders || 0} đơn)\n• Đã lưu vào Lịch Sử Báo Cáo Tháng.`
     });
   } catch (error) {
+    try { db.exec('ROLLBACK'); } catch (_) {}
     console.error('Close month error:', error);
     return res.status(500).json({ success: false, message: 'Lỗi khi chốt tháng!' });
   }
 });
 
-// Xóa hóa đơn cụ thể khỏi lịch sử để dọn bớt đơn hàng rác
-app.delete('/api/orders/:id', authenticateToken, requireAdmin, (req, res) => {
+// Xóa vĩnh viễn hóa đơn cụ thể khỏi lịch sử để dọn bớt đơn hàng rác
+app.delete('/api/orders/:id/permanent', authenticateToken, requireAdmin, (req, res) => {
   const { id } = req.params;
   try {
+    db.exec('BEGIN TRANSACTION');
+    db.prepare('DELETE FROM order_items WHERE orderId = ?').run(id);
     db.prepare('DELETE FROM orders WHERE id = ?').run(id);
-    return res.json({ success: true, message: 'Đã xóa hóa đơn khỏi lịch sử thành công!' });
+    db.exec('COMMIT');
+    return res.json({ success: true, message: 'Đã xóa vĩnh viễn hóa đơn khỏi lịch sử thành công!' });
   } catch (error) {
-    console.error('Delete order error:', error);
-    return res.status(500).json({ success: false, message: 'Lỗi khi xóa hóa đơn!' });
+    try { db.exec('ROLLBACK'); } catch (_) {}
+    console.error('Permanent delete order error:', error);
+    return res.status(500).json({ success: false, message: 'Lỗi khi xóa vĩnh viễn hóa đơn!' });
   }
 });
 

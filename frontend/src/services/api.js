@@ -87,6 +87,8 @@ export const apiService = {
   createTable: (table) => fetchApi('/tables', { method: 'POST', body: JSON.stringify(table) }),
   updateTable: (id, table) => fetchApi(`/tables/${id}`, { method: 'PUT', body: JSON.stringify(table) }),
   deleteTable: (id) => fetchApi(`/tables/${id}`, { method: 'DELETE' }),
+  transferTable: (fromTableId, toTableId) => fetchApi('/tables/transfer', { method: 'POST', body: JSON.stringify({ fromTableId, toTableId }) }),
+  mergeTable: (fromTableId, toTableId) => fetchApi('/tables/merge', { method: 'POST', body: JSON.stringify({ fromTableId, toTableId }) }),
 
   // Orders
   getOrders: (params = '') => fetchApi(`/orders${params}`),
@@ -95,7 +97,9 @@ export const apiService = {
   payOrder: (orderId, payData) => fetchApi(`/orders/${orderId}/pay`, { method: 'PUT', body: JSON.stringify(payData) }),
   cancelOrder: (orderId) => fetchApi(`/orders/${orderId}`, { method: 'DELETE' }),
   deleteOrder: (id) => fetchApi(`/orders/${id}`, { method: 'DELETE' }),
+  permanentDeleteOrder: (id) => fetchApi(`/orders/${id}/permanent`, { method: 'DELETE' }),
   getReceipt: (orderId) => fetchApi(`/orders/${orderId}/receipt`),
+  getOrderVietQR: (orderId) => fetchApi(`/orders/${orderId}/vietqr`),
 
   // Dashboard Reports
   getDashboard: async () => {
