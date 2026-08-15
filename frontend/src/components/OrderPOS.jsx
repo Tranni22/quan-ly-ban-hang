@@ -19,7 +19,10 @@ import {
   ShoppingBag,
   ArrowRightLeft,
   GitMerge,
-  Printer
+  Printer,
+  ChevronRight,
+  Receipt,
+  RotateCcw
 } from 'lucide-react';
 
 // Thẻ món ăn trong thực đơn - Đã bọc React.memo để tránh re-render khi giỏ hàng thay đổi
@@ -249,7 +252,6 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   useEffect(() => {
     if (!selectedTable) return;
 
-    // Reset dữ liệu giỏ hàng của bàn cũ ngay lập tức để tránh hiển thị sai lệch/race condition
     setCurrentOrderId(null);
     setCart([]);
     setOrderNote('');
@@ -374,7 +376,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         if (savedId) {
           setCurrentOrderId(savedId);
         }
-        setNotification('Đã lưu đơn và gửi order tới Bar/Bếp thành công!');
+        setNotification('✅ Đã lưu đơn và gửi order tới Bar/Bếp thành công!');
         setTimeout(() => setNotification(''), 3000);
         setIsCartOpenMobile(false);
         return { success: true, orderId: savedId };
@@ -389,7 +391,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     }
   }, [selectedTable, cart, customerName, orderNote]);
 
-  // Filtered Menu dùng useMemo để không tính toán lại dư thừa
+  // Filtered Menu dùng useMemo
   const filteredMenu = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     return menu.filter((item) => {
@@ -459,6 +461,28 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     [tables, setSelectedTable]
   );
 
+  const handleOpenTransferModal = () => {
+    if (!selectedTable) return;
+    const emptyTables = tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable.id);
+    if (emptyTables.length === 0) {
+      alert('Hiện không có bàn nào còn trống để chuyển sang!');
+      return;
+    }
+    setTargetTransferTableId(String(emptyTables[0].id));
+    setShowTransferModal(true);
+  };
+
+  const handleOpenMergeModal = () => {
+    if (!selectedTable) return;
+    const servingTables = tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable.id);
+    if (servingTables.length === 0) {
+      alert('Hiện không có bàn đang phục vụ nào khác để gộp vào!');
+      return;
+    }
+    setTargetMergeTableId(String(servingTables[0].id));
+    setShowMergeModal(true);
+  };
+
   const handleTransferTable = async () => {
     if (!selectedTable?.id || !targetTransferTableId) return;
     setTransferring(true);
@@ -468,7 +492,6 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         setNotification(`✅ ${res.message}`);
         setTimeout(() => setNotification(''), 3500);
         setShowTransferModal(false);
-        // Tải lại danh sách bàn & chuyển qua bàn đích
         const tablesRes = await apiService.getTables();
         if (tablesRes.success) {
           setTables(tablesRes.data || []);
@@ -492,7 +515,6 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         setNotification(`✅ ${res.message}`);
         setTimeout(() => setNotification(''), 3500);
         setShowMergeModal(false);
-        // Tải lại danh sách bàn & chuyển qua bàn đích
         const tablesRes = await apiService.getTables();
         if (tablesRes.success) {
           setTables(tablesRes.data || []);
@@ -516,10 +538,10 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       shopName: 'COFFEE POS - QUÁN CÀ PHÊ PHIN & ESPRESSO',
       shopAddress: '123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
       shopPhone: '0908.123.456 - 028.3822.8888',
-      isProvisional: true, // Đánh dấu phiếu tạm tính
+      isProvisional: true,
       order: {
-        orderCode: currentOrderId ? `ORD-TT-${currentOrderId}` : 'ORD-TAM-TINH',
-        tableName: selectedTable?.name || 'Mang về',
+        orderCode: currentOrderId ? `ORD-TT-${currentOrderId}` : `TT-${Date.now().toString().slice(-6)}`,
+        tableName: selectedTable ? `${selectedTable.name} (${selectedTable.area})` : 'Mang về',
         customerName: customerName || 'Khách vãng lai',
         staffName: 'Thu Ngân',
         paidAt: new Date().toLocaleString('vi-VN'),
@@ -539,22 +561,23 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-110px)] h-auto pb-16 md:pb-0 relative">
-      {/* Saving Overlay chặn tương tác và tăng trải nghiệm chuyên nghiệp */}
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 lg:h-[calc(100vh-110px)] h-auto pb-20 md:pb-0 relative">
+      {/* Saving Overlay */}
       {saving && (
-        <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-[1px] flex flex-col items-center justify-center select-none font-sans cursor-wait">
-          <div className="bg-coffee-900 text-white p-5 rounded-2xl shadow-xl flex items-center gap-3 border border-amber-400/20">
+        <div className="fixed inset-0 z-[100] bg-white/50 backdrop-blur-[2px] flex flex-col items-center justify-center select-none cursor-wait">
+          <div className="bg-coffee-900 text-white p-5 rounded-2xl shadow-2xl flex items-center gap-3 border border-amber-400/30">
             <div className="w-5 h-5 border-2 border-amber-300 border-t-transparent rounded-full animate-spin"></div>
             <span className="text-xs font-bold tracking-wide">Đang lưu đơn gửi Bar/Bếp...</span>
           </div>
         </div>
       )}
+
       {/* Khung thực đơn bên trái (Cols 7/12) */}
       <div className="lg:col-span-7 flex flex-col h-full bg-white rounded-2xl border border-gray-100 shadow-xs overflow-hidden">
-        {/* Thanh tìm kiếm & chọn danh mục */}
-        <div className="p-4 border-b border-gray-100 space-y-3 bg-gray-50/50">
-          <div className="flex items-center gap-3">
-            {/* Ô tìm kiếm món */}
+        {/* Thanh tìm kiếm & chọn bàn chuyên nghiệp */}
+        <div className="p-3.5 sm:p-4 border-b border-gray-100 space-y-3 bg-gray-50/60">
+          {/* Hàng 1: Ô tìm kiếm món */}
+          <div className="flex items-center gap-2">
             <div className="relative flex-1">
               <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
@@ -562,26 +585,43 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
                 placeholder="Tìm món cà phê, trà, bánh ngọt..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:border-coffee-600 focus:ring-2 focus:ring-coffee-600/20 outline-none transition"
+                className="w-full pl-10 pr-9 py-2.5 bg-white border border-gray-200 rounded-xl text-xs sm:text-sm focus:border-coffee-600 focus:ring-2 focus:ring-coffee-600/20 outline-none transition"
               />
               {searchTerm && (
                 <button
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 text-gray-400 hover:text-gray-600 rounded-full"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 rounded-full"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
             </div>
 
-            {/* Chọn bàn */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-gray-500 whitespace-nowrap">Bàn:</span>
+            {/* Nút giỏ hàng nhanh trên mobile nếu có món */}
+            {cart.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsCartOpenMobile(true)}
+                className="lg:hidden px-3 py-2.5 bg-coffee-800 text-amber-200 font-bold text-xs rounded-xl flex items-center gap-1.5 shadow-xs whitespace-nowrap active:scale-95 transition"
+              >
+                <ShoppingBag className="w-4 h-4" />
+                <span>({cart.reduce((s, i) => s + i.quantity, 0)})</span>
+              </button>
+            )}
+          </div>
+
+          {/* Hàng 2: Chọn bàn & Các nút Chức năng Chuyên Nghiệp (Chuyển bàn, Gộp bàn, In tạm tính) */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-white p-2 sm:p-2.5 rounded-xl border border-gray-200/80 shadow-2xs">
+            {/* Bộ chọn bàn */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-xs font-bold text-gray-500 whitespace-nowrap flex items-center gap-1">
+                <Coffee className="w-3.5 h-3.5 text-coffee-700" /> Bàn:
+              </span>
               <select
                 value={selectedTable?.id || ''}
                 onChange={handleSelectTableChange}
                 disabled={saving || transferring}
-                className="px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-coffee-800 outline-none focus:border-coffee-600 shadow-2xs disabled:opacity-60 disabled:cursor-not-allowed"
+                className="flex-1 px-2.5 py-1.5 bg-gray-50 hover:bg-gray-100 border border-gray-200 rounded-lg text-xs font-bold text-coffee-950 outline-none focus:border-coffee-600 cursor-pointer transition truncate"
               >
                 {tables.map((tbl) => (
                   <option key={tbl.id} value={tbl.id}>
@@ -589,45 +629,48 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
                   </option>
                 ))}
               </select>
-
-              {/* Nút Chuyển bàn & Gộp bàn */}
-              {selectedTable && (
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const emptyTables = tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable.id);
-                      if (emptyTables.length > 0) setTargetTransferTableId(String(emptyTables[0].id));
-                      setShowTransferModal(true);
-                    }}
-                    disabled={saving || transferring}
-                    title="Chuyển toàn bộ đơn sang bàn trống khác"
-                    className="px-2.5 py-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-200 text-amber-900 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs active:scale-95"
-                  >
-                    <ArrowRightLeft className="w-3.5 h-3.5 text-amber-700" />
-                    <span className="hidden sm:inline">Chuyển bàn</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const servingTables = tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable.id);
-                      if (servingTables.length > 0) setTargetMergeTableId(String(servingTables[0].id));
-                      setShowMergeModal(true);
-                    }}
-                    disabled={saving || transferring}
-                    title="Gộp đơn của bàn này vào một bàn đang phục vụ khác"
-                    className="px-2.5 py-2.5 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 text-indigo-900 rounded-xl text-xs font-bold transition flex items-center gap-1 shadow-2xs active:scale-95"
-                  >
-                    <GitMerge className="w-3.5 h-3.5 text-indigo-700" />
-                    <span className="hidden sm:inline">Gộp bàn</span>
-                  </button>
-                </div>
-              )}
             </div>
+
+            {/* Nút Chuyển bàn, Gộp bàn & In Tạm Tính - Luôn hiển thị to rõ trên cả Điện thoại & Máy tính */}
+            {selectedTable && (
+              <div className="flex items-center gap-1.5 justify-end flex-wrap pt-1 sm:pt-0 border-t sm:border-t-0 border-gray-100">
+                <button
+                  type="button"
+                  onClick={handleOpenTransferModal}
+                  disabled={saving || transferring}
+                  title="Chuyển toàn bộ đơn sang bàn trống khác"
+                  className="flex-1 sm:flex-initial px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 active:scale-95 border border-amber-300 text-amber-950 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-amber-700 flex-shrink-0" />
+                  <span>Chuyển Bàn</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleOpenMergeModal}
+                  disabled={saving || transferring}
+                  title="Gộp đơn của bàn này vào một bàn đang phục vụ khác"
+                  className="flex-1 sm:flex-initial px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 active:scale-95 border border-indigo-300 text-indigo-950 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <GitMerge className="w-3.5 h-3.5 text-indigo-700 flex-shrink-0" />
+                  <span>Gộp Bàn</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handlePrintProvisional}
+                  disabled={cart.length === 0}
+                  title="In phiếu tạm tính cho khách xem trước khi thanh toán"
+                  className="flex-1 sm:flex-initial px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 active:scale-95 border border-gray-300 text-gray-800 rounded-lg text-[11px] font-bold transition flex items-center justify-center gap-1 shadow-2xs cursor-pointer disabled:opacity-40"
+                >
+                  <Printer className="w-3.5 h-3.5 text-coffee-700 flex-shrink-0" />
+                  <span>In Phiếu</span>
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Danh mục nằm ngang */}
+          {/* Danh mục nằm ngang cuộn mượt */}
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             <button
               onClick={() => setActiveCategory('ALL')}
@@ -655,12 +698,11 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
           </div>
         </div>
 
-        {/* Lưới các món ăn - Hỗ trợ cuộn dọc liên tục phân nhóm danh mục cực mượt trên di động */}
-        <div className="flex-1 p-4 overflow-y-auto max-h-[calc(100vh-220px)] md:max-h-none no-scrollbar">
+        {/* Lưới các món ăn */}
+        <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto max-h-[calc(100vh-250px)] md:max-h-none no-scrollbar">
           {loading && menu.length === 0 ? (
             <SkeletonMenuGrid count={6} />
           ) : activeCategory === 'ALL' ? (
-            // Hiển thị cuộn liên tiếp nhóm theo danh mục chuẩn UX cao cấp
             (() => {
               const term = searchTerm.trim().toLowerCase();
               const renderedCategories = categories.map((cat) => {
@@ -674,7 +716,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
 
                 return (
                   <div key={cat.id} className="mb-6">
-                    <h3 className="text-xs font-black text-coffee-900 bg-coffee-50/80 border border-coffee-100/50 px-3 py-2 rounded-xl mb-3 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-md">
+                    <h3 className="text-xs font-black text-coffee-900 bg-coffee-50/90 border border-coffee-100 px-3 py-2 rounded-xl mb-3 flex items-center gap-2 sticky top-0 z-10 backdrop-blur-md">
                       <span>{cat.icon}</span>
                       <span>{cat.name}</span>
                       <span className="text-[10px] bg-coffee-200/50 text-coffee-800 px-1.5 py-0.5 rounded-md font-bold">
@@ -712,28 +754,28 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         id="cart-section"
         className={`lg:col-span-5 flex-col h-full bg-white border border-gray-100 shadow-xs overflow-hidden rounded-2xl transition-all duration-300 ${
           isCartOpenMobile
-            ? 'fixed inset-0 z-50 flex flex-col h-[100dvh] w-full'
+            ? 'fixed inset-0 z-50 flex flex-col h-[100dvh] w-full bg-white'
             : 'hidden lg:flex'
         }`}
       >
         {/* Cart Header */}
-        <div className="p-4 border-b border-gray-100 bg-coffee-900 text-white flex items-center justify-between">
+        <div className="p-3.5 sm:p-4 border-b border-gray-100 bg-coffee-900 text-white flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
-              <span className="px-2 py-0.5 bg-amber-400 text-coffee-950 font-black text-xs rounded shadow-2xs">
+              <span className="px-2.5 py-0.5 bg-amber-400 text-coffee-950 font-black text-xs rounded-lg shadow-2xs">
                 {selectedTable?.name || 'Chưa chọn bàn'}
               </span>
               <span className="text-xs text-coffee-200">{selectedTable?.area}</span>
             </div>
-            <p className="text-[11px] text-coffee-300 mt-1">Đơn hàng đang tạo / phục vụ</p>
+            <p className="text-[11px] text-coffee-300 mt-0.5">Đơn hàng đang tạo & phục vụ</p>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
             {cart.length > 0 && (
               <button
                 onClick={handleClearCart}
                 title="Xóa tất cả món trong đơn"
-                className="text-xs text-coffee-300 hover:text-red-300 p-1.5 hover:bg-coffee-800 rounded-lg transition"
+                className="text-xs text-coffee-300 hover:text-red-300 px-2 py-1 hover:bg-coffee-800 rounded-lg transition"
               >
                 Xóa hết
               </button>
@@ -742,13 +784,43 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
             {/* Nút đóng giỏ hàng chỉ hiện trên Mobile */}
             <button
               onClick={() => setIsCartOpenMobile(false)}
-              className="lg:hidden p-1.5 hover:bg-coffee-800 text-coffee-300 hover:text-white rounded-lg transition ml-1"
+              className="lg:hidden p-1.5 hover:bg-coffee-800 text-coffee-200 hover:text-white rounded-lg transition"
               title="Đóng giỏ hàng"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
+
+        {/* Thanh công cụ nhanh bên trong giỏ hàng (Chuyển bàn, Gộp bàn, In tạm tính) */}
+        {selectedTable && (
+          <div className="px-3 py-2 bg-coffee-800/20 border-b border-gray-100 flex items-center justify-between gap-1.5 text-xs">
+            <button
+              type="button"
+              onClick={handleOpenTransferModal}
+              disabled={saving || transferring}
+              className="flex-1 py-1.5 px-2 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200 rounded-lg font-bold flex items-center justify-center gap-1 text-[11px] transition"
+            >
+              <ArrowRightLeft className="w-3 h-3 text-amber-700" /> Chuyển Bàn
+            </button>
+            <button
+              type="button"
+              onClick={handleOpenMergeModal}
+              disabled={saving || transferring}
+              className="flex-1 py-1.5 px-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-900 border border-indigo-200 rounded-lg font-bold flex items-center justify-center gap-1 text-[11px] transition"
+            >
+              <GitMerge className="w-3 h-3 text-indigo-700" /> Gộp Bàn
+            </button>
+            <button
+              type="button"
+              onClick={handlePrintProvisional}
+              disabled={cart.length === 0}
+              className="flex-1 py-1.5 px-2 bg-gray-100 hover:bg-gray-200 text-gray-800 border border-gray-300 rounded-lg font-bold flex items-center justify-center gap-1 text-[11px] transition disabled:opacity-40"
+            >
+              <Printer className="w-3 h-3 text-coffee-800" /> In Tạm Tính
+            </button>
+          </div>
+        )}
 
         {/* Thông báo thao tác */}
         {notification && (
@@ -809,10 +881,10 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
 
         {/* Tổng tiền & Nút tác vụ */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-2.5">
+        <div className="p-3.5 sm:p-4 border-t border-gray-100 bg-gray-50 space-y-2.5">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-600">Tổng tạm tính:</span>
-            <span className="font-extrabold text-coffee-900 text-lg">
+            <span className="font-black text-coffee-900 text-lg">
               {cartTotal.toLocaleString('vi-VN')} đ
             </span>
           </div>
@@ -821,9 +893,9 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
             type="button"
             onClick={handlePrintProvisional}
             disabled={cart.length === 0}
-            className="w-full py-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl shadow-2xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-2.5 bg-white hover:bg-gray-100 border border-gray-300 text-gray-800 font-bold text-xs rounded-xl shadow-2xs transition flex items-center justify-center gap-1.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
           >
-            <Printer className="w-3.5 h-3.5 text-gray-500" />
+            <Printer className="w-4 h-4 text-coffee-700" />
             <span>In Phiếu Tạm Tính Ra Bàn</span>
           </button>
 
@@ -849,7 +921,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
       </div>
 
-      {/* Modal Xác Nhận Gửi Bếp (Chống ấn nhầm) */}
+      {/* Modal Xác Nhận Gửi Bếp */}
       {showConfirmSendModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
@@ -896,7 +968,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
       )}
 
-      {/* Modal Xác Nhận Thanh Toán (Chống ấn nhầm) */}
+      {/* Modal Xác Nhận Thanh Toán */}
       {showConfirmCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
@@ -943,76 +1015,122 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
       )}
 
-      {/* Floating Cart Button cho Mobile khi có món trong giỏ */}
-      {cart.length > 0 && (
-        <div className="lg:hidden fixed bottom-14 left-3 right-3 bg-coffee-900 text-white p-3 rounded-2xl shadow-2xl z-30 flex items-center justify-between border border-amber-400/30">
-          <div className="flex items-center gap-2.5">
-            <div className="relative p-2 bg-amber-400 text-coffee-950 rounded-xl font-black text-xs">
+      {/* Floating Bar cho Mobile khi có món trong giỏ */}
+      {cart.length > 0 && !isCartOpenMobile && (
+        <div className="lg:hidden fixed bottom-14 left-3 right-3 bg-coffee-950 text-white p-2.5 sm:p-3 rounded-2xl shadow-2xl z-30 flex items-center justify-between border border-amber-400/40 backdrop-blur-md animate-slideUp">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="relative p-2 bg-amber-400 text-coffee-950 rounded-xl font-black text-xs flex-shrink-0">
               <ShoppingBag className="w-5 h-5" />
-              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-extrabold border-2 border-coffee-900">
+              <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] w-5 h-5 rounded-full flex items-center justify-center font-extrabold border-2 border-coffee-950">
                 {cart.reduce((sum, i) => sum + i.quantity, 0)}
               </span>
             </div>
-            <div>
-              <div className="text-[11px] text-amber-200 font-bold">Món đã chọn</div>
-              <div className="text-xs font-black text-white">{cartTotal.toLocaleString('vi-VN')} đ</div>
+            <div className="truncate">
+              <div className="text-[10px] text-amber-200 font-bold truncate">
+                {selectedTable?.name || 'Đơn hàng'}
+              </div>
+              <div className="text-xs font-black text-white">
+                {cartTotal.toLocaleString('vi-VN')} đ
+              </div>
             </div>
           </div>
 
-          <button
-            onClick={() => setIsCartOpenMobile(true)}
-            className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-coffee-950 font-black text-xs rounded-xl shadow transition"
-          >
-            Xem món đã chọn ↓
-          </button>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button
+              type="button"
+              onClick={handlePrintProvisional}
+              title="In phiếu tạm tính"
+              className="p-2 bg-coffee-800 hover:bg-coffee-700 text-amber-200 rounded-xl border border-coffee-700 active:scale-95 transition"
+            >
+              <Printer className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setIsCartOpenMobile(true)}
+              className="px-3.5 py-2 bg-amber-400 hover:bg-amber-300 active:scale-95 text-coffee-950 font-black text-xs rounded-xl shadow transition flex items-center gap-1"
+            >
+              <span>Xem Đơn</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Modal Chuyển Bàn */}
       {showTransferModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-amber-50 text-amber-900 rounded-2xl border border-amber-200">
-                <ArrowRightLeft className="w-6 h-6 text-amber-700" />
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl">
+                  <ArrowRightLeft className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-gray-900 text-base">Chuyển Bàn POS</h3>
+                  <p className="text-xs text-gray-500">Chuyển toàn bộ đơn từ {selectedTable?.name} sang bàn trống</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-extrabold text-gray-900 text-base">Chuyển Bàn POS</h3>
-                <p className="text-xs text-gray-500">Chuyển toàn bộ món từ {selectedTable?.name} sang bàn trống</p>
+              <button
+                type="button"
+                onClick={() => setShowTransferModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-amber-50/70 border border-amber-200/60 rounded-2xl space-y-1 text-xs">
+              <div className="font-bold text-gray-700">
+                Bàn nguồn: <span className="text-amber-900 font-extrabold">{selectedTable?.name} ({selectedTable?.area})</span>
+              </div>
+              <div className="text-gray-600">
+                Tổng tiền đơn: <span className="font-bold text-coffee-800">{cartTotal.toLocaleString('vi-VN')} đ</span> ({cart.reduce((s, i) => s + i.quantity, 0)} món)
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-600 block">Chọn bàn trống đích:</label>
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1.5">Chọn bàn trống đích:</label>
               <select
                 value={targetTransferTableId}
                 onChange={(e) => setTargetTransferTableId(e.target.value)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-xs outline-none"
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-coffee-900 outline-none focus:border-coffee-600 shadow-2xs"
               >
-                {tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable?.id).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.area}) - {t.seats} Ghế
-                  </option>
-                ))}
-                {tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable?.id).length === 0 && (
-                  <option value="">-- Không có bàn trống nào --</option>
-                )}
+                {tables
+                  .filter((t) => t.status === 'EMPTY' && t.id !== selectedTable?.id)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      🟢 {t.name} — Khu vực: {t.area} ({t.seats} chỗ)
+                    </option>
+                  ))}
               </select>
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
               <button
+                type="button"
                 onClick={() => setShowTransferModal(false)}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+                disabled={transferring}
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
               >
-                Đóng / Hủy
+                Hủy Bỏ
               </button>
               <button
+                type="button"
                 onClick={handleTransferTable}
                 disabled={transferring || !targetTransferTableId}
-                className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                {transferring ? 'Đang chuyển...' : 'Xác Nhận Chuyển'}
+                {transferring ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang chuyển...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Xác Nhận Chuyển</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
@@ -1022,48 +1140,80 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       {/* Modal Gộp Bàn */}
       {showMergeModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-gray-100 space-y-4">
-            <div className="flex items-center gap-3">
-              <div className="p-3 bg-indigo-50 text-indigo-950 rounded-2xl border border-indigo-200">
-                <GitMerge className="w-6 h-6 text-indigo-700" />
+          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-100 text-indigo-800 rounded-2xl">
+                  <GitMerge className="w-6 h-6" />
+                </div>
+                <div>
+                  <h3 className="font-black text-gray-900 text-base">Gộp Bàn POS</h3>
+                  <p className="text-xs text-gray-500">Gộp tất cả món từ {selectedTable?.name} vào bàn đang phục vụ khác</p>
+                </div>
               </div>
-              <div>
-                <h3 className="font-extrabold text-gray-900 text-base">Gộp Bàn POS</h3>
-                <p className="text-xs text-gray-500">Gộp tất cả món từ {selectedTable?.name} vào bàn đang phục vụ khác</p>
+              <button
+                type="button"
+                onClick={() => setShowMergeModal(false)}
+                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-3.5 bg-indigo-50/70 border border-indigo-200/60 rounded-2xl space-y-1 text-xs">
+              <div className="font-bold text-gray-700">
+                Bàn nguồn: <span className="text-indigo-900 font-extrabold">{selectedTable?.name} ({selectedTable?.area})</span>
+              </div>
+              <div className="text-gray-600">
+                Tiền đơn: <span className="font-bold text-coffee-800">{cartTotal.toLocaleString('vi-VN')} đ</span>
               </div>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-600 block">Chọn bàn gộp đích (Bàn đang phục vụ):</label>
+            <div>
+              <label className="text-xs font-bold text-gray-700 block mb-1.5">
+                Chọn bàn gộp đích (Bàn đang phục vụ):
+              </label>
               <select
                 value={targetMergeTableId}
                 onChange={(e) => setTargetMergeTableId(e.target.value)}
-                className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl font-bold text-xs outline-none"
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-indigo-950 outline-none focus:border-indigo-600 shadow-2xs"
               >
-                {tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable?.id).map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name} ({t.area}) - Đơn hiện có
-                  </option>
-                ))}
-                {tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable?.id).length === 0 && (
-                  <option value="">-- Không có bàn SERVING khác --</option>
-                )}
+                {tables
+                  .filter((t) => t.status === 'SERVING' && t.id !== selectedTable?.id)
+                  .map((t) => (
+                    <option key={t.id} value={t.id}>
+                      🟡 {t.name} ({t.area}) — Đang có đơn: {(t.currentOrder?.totalAmount || 0).toLocaleString('vi-VN')} đ
+                    </option>
+                  ))}
               </select>
             </div>
 
-            <div className="flex items-center gap-2 pt-2">
+            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
               <button
+                type="button"
                 onClick={() => setShowMergeModal(false)}
-                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+                disabled={transferring}
+                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
               >
-                Đóng / Hủy
+                Hủy Bỏ
               </button>
               <button
+                type="button"
                 onClick={handleMergeTable}
                 disabled={transferring || !targetMergeTableId}
-                className="flex-1 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
               >
-                {transferring ? 'Đang gộp...' : 'Xác Nhận Gộp Bàn'}
+                {transferring ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Đang gộp...</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-4 h-4" />
+                    <span>Xác Nhận Gộp Bàn</span>
+                  </>
+                )}
               </button>
             </div>
           </div>

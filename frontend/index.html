@@ -78,11 +78,31 @@
         border-radius: 99px;
       }
       @media print {
+        @page {
+          margin: 0;
+          size: auto;
+        }
+        body {
+          background: white !important;
+          color: black !important;
+        }
         .no-print {
           display: none !important;
         }
-        .print-only {
-          display: block !important;
+        .fixed, .inset-0 {
+          position: static !important;
+          background: transparent !important;
+          padding: 0 !important;
+        }
+        #receipt-print-area {
+          width: 80mm !important;
+          max-width: 100% !important;
+          margin: 0 auto !important;
+          padding: 10px !important;
+          background: white !important;
+          color: black !important;
+          box-shadow: none !important;
+          border: none !important;
         }
       }
     </style>
