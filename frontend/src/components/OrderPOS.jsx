@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, memo } from 'react';
 import { apiService } from '../services/api';
 import { SkeletonMenuGrid } from './SkeletonLoader';
+import ReceiptInvoice from './ReceiptInvoice';
 import {
   Search,
   Plus,
@@ -17,7 +18,8 @@ import {
   Check,
   ShoppingBag,
   ArrowRightLeft,
-  GitMerge
+  GitMerge,
+  Printer
 } from 'lucide-react';
 
 // Thẻ món ăn trong thực đơn - Đã bọc React.memo để tránh re-render khi giỏ hàng thay đổi
@@ -208,6 +210,9 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   const [targetTransferTableId, setTargetTransferTableId] = useState('');
   const [targetMergeTableId, setTargetMergeTableId] = useState('');
   const [transferring, setTransferring] = useState(false);
+
+  // Trạng thái phiếu tạm tính
+  const [provisionalReceipt, setProvisionalReceipt] = useState(null);
 
   // Tải Menu & Tables
   const loadData = useCallback(async (isBackground = false) => {
@@ -502,6 +507,37 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
     }
   };
 
+  const handlePrintProvisional = () => {
+    if (cart.length === 0) {
+      alert('Vui lòng chọn ít nhất 1 món để in phiếu tạm tính!');
+      return;
+    }
+    const mockReceipt = {
+      shopName: 'COFFEE POS - QUÁN CÀ PHÊ PHIN & ESPRESSO',
+      shopAddress: '123 Đường Nguyễn Huệ, Phường Bến Nghé, Quận 1, TP. Hồ Chí Minh',
+      shopPhone: '0908.123.456 - 028.3822.8888',
+      isProvisional: true, // Đánh dấu phiếu tạm tính
+      order: {
+        orderCode: currentOrderId ? `ORD-TT-${currentOrderId}` : 'ORD-TAM-TINH',
+        tableName: selectedTable?.name || 'Mang về',
+        customerName: customerName || 'Khách vãng lai',
+        staffName: 'Thu Ngân',
+        paidAt: new Date().toLocaleString('vi-VN'),
+        totalAmount: cartTotal,
+        finalAmount: cartTotal,
+        discountPercent: 0,
+        paymentMethod: 'CHƯA THANH TOÁN (TẠM TÍNH)',
+        items: cart.map((i) => ({
+          itemName: i.name,
+          quantity: i.quantity,
+          totalPrice: i.price * i.quantity,
+          note: i.note
+        }))
+      }
+    };
+    setProvisionalReceipt(mockReceipt);
+  };
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-110px)] h-auto pb-16 md:pb-0 relative">
       {/* Saving Overlay chặn tương tác và tăng trải nghiệm chuyên nghiệp */}
@@ -773,13 +809,23 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
 
         {/* Tổng tiền & Nút tác vụ */}
-        <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-3">
+        <div className="p-4 border-t border-gray-100 bg-gray-50 space-y-2.5">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-gray-600">Tổng tạm tính:</span>
             <span className="font-extrabold text-coffee-900 text-lg">
               {cartTotal.toLocaleString('vi-VN')} đ
             </span>
           </div>
+
+          <button
+            type="button"
+            onClick={handlePrintProvisional}
+            disabled={cart.length === 0}
+            className="w-full py-2 bg-white hover:bg-gray-100 border border-gray-300 text-gray-700 font-bold text-xs rounded-xl shadow-2xs transition flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Printer className="w-3.5 h-3.5 text-gray-500" />
+            <span>In Phiếu Tạm Tính Ra Bàn</span>
+          </button>
 
           <div className="grid grid-cols-2 gap-2">
             <button
@@ -1022,6 +1068,14 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal In Phiếu Tạm Tính Ra Bàn */}
+      {provisionalReceipt && (
+        <ReceiptInvoice
+          receiptData={provisionalReceipt}
+          onClose={() => setProvisionalReceipt(null)}
+        />
       )}
     </div>
   );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiService } from '../services/api';
+import ReceiptInvoice from './ReceiptInvoice';
 import {
   TrendingUp,
   ShoppingBag,
@@ -13,7 +14,12 @@ import {
   BarChart2,
   Calendar,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  Download,
+  Eye,
+  Printer,
+  FileSpreadsheet,
+  PieChart
 } from 'lucide-react';
 
 export default function AdminDashboard({ activeSubTab = 'reports' }) {
@@ -26,6 +32,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
   const [categories, setCategories] = useState([]);
   const [deletedItems, setDeletedItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedReceipt, setSelectedReceipt] = useState(null);
 
   // Form State cho thêm/sửa món
   const [showModal, setShowModal] = useState(false);
@@ -99,6 +106,55 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
       } catch (err) {
         alert(err.message || 'Lỗi khi xóa hóa đơn!');
       }
+    }
+  };
+
+  // Xuất dữ liệu báo cáo ra file Excel / CSV chuẩn UTF-8 có BOM
+  const handleExportCSV = () => {
+    let filename = `Bao_Cao_${historyType.toUpperCase()}_${new Date().toISOString().slice(0, 10)}.csv`;
+    let csvContent = '\uFEFF'; // UTF-8 BOM để Excel hiển thị tiếng Việt không bị lỗi font
+
+    if (historyType === 'shift') {
+      csvContent += 'Mã Báo Cáo,Ngày,Ca Làm Việc,Số Lượng Đơn,Doanh Thu (VNĐ),Người Chốt,Thời Gian Chốt\n';
+      (dashboardData?.shiftReportsHistory || []).forEach((r) => {
+        csvContent += `"${r.id}","${r.reportDate}","${r.shiftName}","${r.totalOrders}","${r.totalRevenue}","${r.closedBy || 'Admin'}","${r.closedAt}"\n`;
+      });
+    } else if (historyType === 'daily') {
+      csvContent += 'Mã Báo Cáo,Ngày Báo Cáo,Số Lượng Đơn,Doanh Thu (VNĐ),Thời Gian Chốt\n';
+      (dashboardData?.dailyReportsHistory || []).forEach((r) => {
+        csvContent += `"${r.id}","${r.reportDate}","${r.totalOrders}","${r.totalRevenue}","${r.closedAt}"\n`;
+      });
+    } else if (historyType === 'weekly') {
+      csvContent += 'Mã Báo Cáo,Chu Kỳ Tuần,Từ Ngày,Đến Ngày,Số Lượng Đơn,Doanh Thu (VNĐ),Thời Gian Chốt\n';
+      (dashboardData?.weeklyReportsHistory || []).forEach((r) => {
+        csvContent += `"${r.id}","${r.weekCode || ''}","${r.startDate}","${r.endDate}","${r.totalOrders}","${r.totalRevenue}","${r.closedAt}"\n`;
+      });
+    } else {
+      csvContent += 'Mã Báo Cáo,Chu Kỳ Tháng,Từ Ngày,Đến Ngày,Số Lượng Đơn,Doanh Thu (VNĐ),Thời Gian Chốt\n';
+      (dashboardData?.monthlyReportsHistory || []).forEach((r) => {
+        csvContent += `"${r.id}","${r.monthCode || ''}","${r.startDate}","${r.endDate}","${r.totalOrders}","${r.totalRevenue}","${r.closedAt}"\n`;
+      });
+    }
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Xem chi tiết và in lại hóa đơn
+  const handleViewReceipt = async (orderId) => {
+    try {
+      const res = await apiService.getReceipt(orderId);
+      if (res.success && res.receipt) {
+        setSelectedReceipt(res.receipt);
+      }
+    } catch (err) {
+      alert(err.message || 'Lỗi khi tải chi tiết hóa đơn!');
     }
   };
 
@@ -384,7 +440,112 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
             </div>
           </div>
 
-          {/* Charts & Top Items Row */}
+          {/* Biểu đồ Cột Doanh Thu 7 Ngày & Tỷ lệ Thanh Toán */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+            {/* 7 Days Revenue Bar Chart */}
+            <div className="lg:col-span-8 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                  <BarChart2 className="w-4 h-4 text-coffee-600" />
+                  Biểu Đồ Doanh Thu 7 Ngày Gần Nhất
+                </h3>
+                <span className="text-[11px] text-gray-400 font-medium">Xu hướng tăng trưởng</span>
+              </div>
+
+              {(!dashboardData?.recent7Days || dashboardData?.recent7Days.length === 0) ? (
+                <div className="py-12 text-center text-gray-400 text-xs">Chưa có dữ liệu giao dịch 7 ngày qua</div>
+              ) : (
+                <div className="pt-4">
+                  {(() => {
+                    const days = dashboardData.recent7Days;
+                    const maxRevenue = Math.max(...days.map((d) => d.revenue || 0), 1);
+                    return (
+                      <div className="grid grid-cols-7 gap-2 items-end h-44 pb-2 border-b border-gray-100">
+                        {days.map((d, idx) => {
+                          const heightPercent = Math.max(Math.round(((d.revenue || 0) / maxRevenue) * 100), 6);
+                          const dayLabel = d.date ? d.date.split('-').slice(1).join('/') : `N-${idx + 1}`;
+                          return (
+                            <div key={idx} className="flex flex-col items-center gap-1.5 h-full justify-end group">
+                              <span className="text-[9px] font-bold text-coffee-800 opacity-0 group-hover:opacity-100 transition whitespace-nowrap">
+                                {(d.revenue || 0).toLocaleString('vi-VN')} đ
+                              </span>
+                              <div
+                                style={{ height: `${heightPercent}%` }}
+                                className={`w-full max-w-[36px] rounded-t-xl transition-all duration-300 relative ${
+                                  idx === days.length - 1
+                                    ? 'bg-gradient-to-t from-coffee-800 to-amber-500 shadow-sm'
+                                    : 'bg-gradient-to-t from-coffee-600 to-coffee-400 hover:from-coffee-700 hover:to-amber-400'
+                                }`}
+                              >
+                                <div className="absolute inset-0 rounded-t-xl opacity-0 group-hover:opacity-20 bg-white transition"></div>
+                              </div>
+                              <span className="text-[10px] font-bold text-gray-500">{dayLabel}</span>
+                              <span className="text-[9px] text-gray-400">{d.orders || 0} đơn</span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              )}
+            </div>
+
+            {/* Payment Methods Breakdown */}
+            <div className="lg:col-span-4 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4 flex flex-col justify-between">
+              <div>
+                <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
+                  <PieChart className="w-4 h-4 text-emerald-600" />
+                  Cơ Cấu Phương Thức Thanh Toán
+                </h3>
+                <p className="text-[11px] text-gray-400 mt-1">Đối soát dòng tiền chuyển khoản vs tiền mặt</p>
+
+                {(() => {
+                  const orders = dashboardData?.recentOrders || [];
+                  const qrOrders = orders.filter((o) => o.paymentMethod === 'TRANSFER_QR' && o.status === 'PAID');
+                  const cashOrders = orders.filter((o) => o.paymentMethod !== 'TRANSFER_QR' && o.status === 'PAID');
+                  const qrTotal = qrOrders.reduce((s, o) => s + (o.finalAmount || 0), 0);
+                  const cashTotal = cashOrders.reduce((s, o) => s + (o.finalAmount || 0), 0);
+                  const total = qrTotal + cashTotal || 1;
+                  const qrPercent = Math.round((qrTotal / total) * 100);
+                  const cashPercent = 100 - qrPercent;
+
+                  return (
+                    <div className="mt-4 space-y-3">
+                      <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden flex shadow-inner">
+                        <div style={{ width: `${qrPercent}%` }} className="bg-amber-500 h-full transition-all duration-500" title={`QR Code: ${qrPercent}%`}></div>
+                        <div style={{ width: `${cashPercent}%` }} className="bg-emerald-500 h-full transition-all duration-500" title={`Tiền Mặt: ${cashPercent}%`}></div>
+                      </div>
+
+                      <div className="space-y-2 pt-2 text-xs">
+                        <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+                            <span className="font-bold text-amber-900">VietQR Chuyển Khoản</span>
+                          </div>
+                          <span className="font-extrabold text-amber-900">{qrPercent}% ({qrTotal.toLocaleString('vi-VN')} đ)</span>
+                        </div>
+
+                        <div className="p-2.5 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="w-3 h-3 rounded-full bg-emerald-500"></span>
+                            <span className="font-bold text-emerald-900">Tiền Mặt Tại Két</span>
+                          </div>
+                          <span className="font-extrabold text-emerald-900">{cashPercent}% ({cashTotal.toLocaleString('vi-VN')} đ)</span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="p-3 bg-gray-50 rounded-xl text-[11px] text-gray-500 border border-gray-100">
+                💡 <b>Mẹo quản trị:</b> Khuyến khích khách quét mã VietQR giúp đối soát 100% tự động, tránh thất thoát tiền mặt.
+              </div>
+            </div>
+          </div>
+
+          {/* Top Items & Recent Orders Row */}
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
             {/* Top 5 Items (Cols 5) */}
             <div className="lg:col-span-5 bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
@@ -436,7 +597,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                       <th className="p-2.5">Tổng Tiền</th>
                       <th className="p-2.5">Hình Thức</th>
                       <th className="p-2.5">Trạng Thái</th>
-                      <th className="p-2.5 text-right">Dọn rác</th>
+                      <th className="p-2.5 text-right">Tác vụ</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -469,10 +630,17 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                               : 'Chờ Phục Vụ'}
                           </span>
                         </td>
-                        <td className="p-2.5 text-right">
+                        <td className="p-2.5 text-right flex items-center justify-end gap-1">
+                          <button
+                            onClick={() => handleViewReceipt(ord.id)}
+                            className="p-1.5 text-coffee-700 hover:bg-coffee-50 rounded-lg transition"
+                            title="Xem chi tiết & in lại hóa đơn này"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                          </button>
                           <button
                             onClick={() => handleDeleteOrder(ord.id)}
-                            className="p-1 text-red-600 hover:bg-red-50 rounded-lg transition"
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition"
                             title="Xóa vĩnh viễn hóa đơn này khỏi lịch sử"
                           >
                             <Trash2 className="w-3.5 h-3.5" />
@@ -492,46 +660,57 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
               <h3 className="font-bold text-gray-900 text-sm flex items-center gap-2">
                 📋 Lịch Sử Báo Cáo Doanh Thu Tổng Kết
               </h3>
-              <div className="flex items-center gap-1 overflow-x-auto bg-gray-100 p-1 rounded-xl no-scrollbar">
+              <div className="flex items-center gap-2 flex-wrap">
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl no-scrollbar">
+                  <button
+                    onClick={() => setHistoryType('shift')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      historyType === 'shift'
+                        ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    ☕ Theo Ca ({dashboardData?.shiftReportsHistory?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setHistoryType('daily')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      historyType === 'daily'
+                        ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    📅 Theo Ngày ({dashboardData?.dailyReportsHistory?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setHistoryType('weekly')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      historyType === 'weekly'
+                        ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    🗓️ Theo Tuần ({dashboardData?.weeklyReportsHistory?.length || 0})
+                  </button>
+                  <button
+                    onClick={() => setHistoryType('monthly')}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
+                      historyType === 'monthly'
+                        ? 'bg-coffee-800 text-amber-200 shadow-sm'
+                        : 'text-gray-600 hover:text-gray-900'
+                    }`}
+                  >
+                    📆 Theo Tháng ({dashboardData?.monthlyReportsHistory?.length || 0})
+                  </button>
+                </div>
+
                 <button
-                  onClick={() => setHistoryType('shift')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                    historyType === 'shift'
-                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
+                  onClick={handleExportCSV}
+                  title="Xuất bảng báo cáo ra file Excel / CSV đối soát"
+                  className="px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-2xs"
                 >
-                  ☕ Theo Ca ({dashboardData?.shiftReportsHistory?.length || 0})
-                </button>
-                <button
-                  onClick={() => setHistoryType('daily')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                    historyType === 'daily'
-                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  📅 Theo Ngày ({dashboardData?.dailyReportsHistory?.length || 0})
-                </button>
-                <button
-                  onClick={() => setHistoryType('weekly')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                    historyType === 'weekly'
-                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  🗓️ Theo Tuần ({dashboardData?.weeklyReportsHistory?.length || 0})
-                </button>
-                <button
-                  onClick={() => setHistoryType('monthly')}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition whitespace-nowrap ${
-                    historyType === 'monthly'
-                      ? 'bg-coffee-800 text-amber-200 shadow-sm'
-                      : 'text-gray-600 hover:text-gray-900'
-                  }`}
-                >
-                  📆 Theo Tháng ({dashboardData?.monthlyReportsHistory?.length || 0})
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Xuất Excel (CSV)</span>
                 </button>
               </div>
             </div>
@@ -955,6 +1134,14 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Modal Xem & In Lại Hóa Đơn Lịch Sử */}
+      {selectedReceipt && (
+        <ReceiptInvoice
+          receiptData={selectedReceipt}
+          onClose={() => setSelectedReceipt(null)}
+        />
       )}
     </div>
   );

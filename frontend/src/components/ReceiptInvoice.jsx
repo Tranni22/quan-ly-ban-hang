@@ -16,15 +16,17 @@ export default function ReceiptInvoice({ receiptData, onClose }) {
         {/* Header bar - no print */}
         <div className="no-print bg-coffee-900 text-white p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-            <span className="text-xs font-bold">Thanh Toán Thành Công</span>
+            <CheckCircle2 className={`w-5 h-5 ${receiptData.isProvisional ? 'text-amber-400' : 'text-emerald-400'}`} />
+            <span className="text-xs font-bold">
+              {receiptData.isProvisional ? 'Phiếu Tạm Tính Bàn' : 'Thanh Toán Thành Công'}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <button
               onClick={handlePrint}
               className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-coffee-950 font-bold text-xs rounded-xl flex items-center gap-1.5 transition"
             >
-              <Printer className="w-4 h-4" /> In Hoá Đơn
+              <Printer className="w-4 h-4" /> {receiptData.isProvisional ? 'In Phiếu Tạm Tính' : 'In Hoá Đơn'}
             </button>
             <button
               onClick={onClose}
@@ -49,9 +51,14 @@ export default function ReceiptInvoice({ receiptData, onClose }) {
 
           {/* Bill Meta */}
           <div className="py-3 border-b border-dashed border-gray-300 space-y-1 text-[11px]">
-            <div className="text-center font-bold text-gray-900 text-xs mb-2">
-              HOÁ ĐƠN THANH TOÁN
+            <div className="text-center font-bold text-gray-900 text-xs mb-1">
+              {receiptData.isProvisional ? 'PHIẾU TẠM TÍNH (CHƯA THANH TOÁN)' : 'HOÁ ĐƠN THANH TOÁN'}
             </div>
+            {receiptData.isProvisional && (
+              <div className="text-center text-[10px] text-amber-700 italic mb-2">
+                (Quý khách vui lòng đối chiếu món & số lượng)
+              </div>
+            )}
             <div className="flex justify-between">
               <span>Mã HĐ:</span>
               <span className="font-bold">{order.orderCode}</span>
