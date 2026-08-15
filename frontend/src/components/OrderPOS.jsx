@@ -503,7 +503,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 min-h-[calc(100vh-100px)] pb-16 md:pb-0 relative">
+    <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:h-[calc(100vh-110px)] h-auto pb-16 md:pb-0 relative">
       {/* Saving Overlay chặn tương tác và tăng trải nghiệm chuyên nghiệp */}
       {saving && (
         <div className="fixed inset-0 z-[100] bg-white/40 backdrop-blur-[1px] flex flex-col items-center justify-center select-none font-sans cursor-wait">
