@@ -610,7 +610,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                     ) : (
                       dashboardData?.weeklyReportsHistory?.map((rep, idx) => (
                         <tr key={idx} className="hover:bg-gray-50/80 transition">
-                          <td className="p-2.5 font-bold text-gray-900">{rep.periodLabel}</td>
+                          <td className="p-2.5 font-bold text-gray-900">{rep.weekCode || rep.periodLabel}</td>
                           <td className="p-2.5">
                             <span className="px-2 py-0.5 rounded-md bg-purple-100 text-purple-900 font-extrabold text-[10px]">
                               Tổng Kết Tuần
@@ -638,7 +638,7 @@ export default function AdminDashboard({ activeSubTab = 'reports' }) {
                     ) : (
                       dashboardData?.monthlyReportsHistory?.map((rep, idx) => (
                         <tr key={idx} className="hover:bg-gray-50/80 transition">
-                          <td className="p-2.5 font-bold text-gray-900">{rep.periodLabel}</td>
+                          <td className="p-2.5 font-bold text-gray-900">{rep.monthCode || rep.periodLabel}</td>
                           <td className="p-2.5">
                             <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-extrabold text-[10px]">
                               Tổng Kết Tháng
