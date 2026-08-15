@@ -666,6 +666,9 @@ app.put('/api/orders/:id/pay', authenticateToken, (req, res) => {
 
     db.exec('BEGIN TRANSACTION');
 
+    // Lấy thời gian local chuẩn VN (UTC+7) từ Node.js để tránh lệch múi giờ SQLite
+    const nowLocal = new Date(Date.now() + 7 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+
     // Cập nhật Order status = PAID
     db.prepare(`
       UPDATE orders 
@@ -673,9 +676,9 @@ app.put('/api/orders/:id/pay', authenticateToken, (req, res) => {
           paymentMethod = ?,
           discountPercent = ?,
           finalAmount = ?,
-          paidAt = datetime('now', 'localtime')
+          paidAt = ?
       WHERE id = ?
-    `).run(paymentMethod || 'CASH', discount, finalAmount, id);
+    `).run(paymentMethod || 'CASH', discount, finalAmount, nowLocal, id);
 
     // Đổi trạng thái bàn thành EMPTY (nếu không còn order pending khác)
     if (order.tableId) {
@@ -823,12 +826,13 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
   try {
     const weekRange = getWeekRange();
     const monthRange = getMonthRange();
+    const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
 
     // 0. Đếm số ca đã chốt trong ngày hôm nay
     const shiftsToday = db.prepare(`
       SELECT COUNT(*) as count FROM shift_reports 
-      WHERE reportDate = date('now', 'localtime')
-    `).get().count;
+      WHERE reportDate = ?
+    `).get(todayStr).count;
 
     const currentShiftNum = (shiftsToday % 3) + 1;
     const shiftNames = { 1: 'Ca 1 (Sáng)', 2: 'Ca 2 (Chiều)', 3: 'Ca 3 (Tối)' };
@@ -840,8 +844,8 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
         COUNT(*) as totalOrders,
         COALESCE(SUM(finalAmount), 0) as totalRevenue
       FROM orders 
-      WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
-    `).get();
+      WHERE status = 'PAID' AND substr(paidAt, 1, 10) = ?
+    `).get(todayStr);
 
     // 1b. Thống kê tuần này (Tính theo khung thời gian Thứ 2 -> Chủ Nhật chuẩn)
     const weekSales = db.prepare(`
@@ -950,15 +954,16 @@ app.get('/api/reports/dashboard', authenticateToken, (req, res) => {
 // 1. NÚT 1: Chốt Ca Hiện Tại / Chốt Bây Giờ
 app.post('/api/reports/close-shift', authenticateToken, requireAdmin, (req, res) => {
   try {
-    const reportDate = new Date().toISOString().split('T')[0];
+    const todayStr = new Date(Date.now() + 7 * 3600 * 1000).toISOString().split('T')[0];
+    const nowLocal = new Date(Date.now() + 7 * 3600 * 1000).toISOString().replace('T', ' ').slice(0, 19);
     const staffName = req.user?.fullName || 'Admin';
 
     db.exec('BEGIN TRANSACTION');
 
     const shiftsToday = db.prepare(`
       SELECT COUNT(*) as count FROM shift_reports 
-      WHERE reportDate = date('now', 'localtime')
-    `).get().count;
+      WHERE reportDate = ?
+    `).get(todayStr).count;
 
     const shiftNum = (shiftsToday % 3) + 1;
     const shiftNames = { 1: 'Ca 1 (Sáng)', 2: 'Ca 2 (Chiều)', 3: 'Ca 3 (Tối & Chốt Ngày)' };
@@ -969,38 +974,38 @@ app.post('/api/reports/close-shift', authenticateToken, requireAdmin, (req, res)
         COUNT(*) as totalOrders,
         COALESCE(SUM(finalAmount), 0) as totalRevenue
       FROM orders 
-      WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
-    `).get();
+      WHERE status = 'PAID' AND substr(paidAt, 1, 10) = ?
+    `).get(todayStr);
 
     db.prepare(`
       INSERT INTO shift_reports (reportDate, shiftNumber, shiftName, totalOrders, totalRevenue, closedBy, closedAt)
-      VALUES (date('now', 'localtime'), ?, ?, ?, ?, ?, datetime('now', 'localtime'))
-    `).run(shiftNum, shiftName, shiftSummary.totalOrders, shiftSummary.totalRevenue, staffName);
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(todayStr, shiftNum, shiftName, shiftSummary.totalOrders, shiftSummary.totalRevenue, staffName, nowLocal);
 
     // Cập nhật cả daily_reports cho ngày hôm nay
     const dayTotal = db.prepare(`
       SELECT SUM(totalOrders) as totalOrders, SUM(totalRevenue) as totalRevenue
-      FROM shift_reports WHERE reportDate = date('now', 'localtime')
-    `).get();
+      FROM shift_reports WHERE reportDate = ?
+    `).get(todayStr);
 
-    const existingDaily = db.prepare("SELECT id FROM daily_reports WHERE reportDate = date('now', 'localtime')").get();
+    const existingDaily = db.prepare("SELECT id FROM daily_reports WHERE reportDate = ?").get(todayStr);
     if (existingDaily) {
       db.prepare(`
         UPDATE daily_reports 
-        SET totalOrders = ?, totalRevenue = ?, closedAt = datetime('now', 'localtime')
-        WHERE reportDate = date('now', 'localtime')
-      `).run(dayTotal.totalOrders, dayTotal.totalRevenue);
+        SET totalOrders = ?, totalRevenue = ?, closedAt = ?
+        WHERE reportDate = ?
+      `).run(dayTotal.totalOrders, dayTotal.totalRevenue, nowLocal, todayStr);
     } else {
       db.prepare(`
         INSERT INTO daily_reports (reportDate, totalOrders, totalRevenue, closedAt)
-        VALUES (date('now', 'localtime'), ?, ?, datetime('now', 'localtime'))
-      `).run(dayTotal.totalOrders, dayTotal.totalRevenue);
+        VALUES (?, ?, ?, ?)
+      `).run(todayStr, dayTotal.totalOrders, dayTotal.totalRevenue, nowLocal);
     }
 
     db.prepare(`
       UPDATE orders SET status = 'CLOSED' 
-      WHERE status = 'PAID' AND date(paidAt) = date('now', 'localtime')
-    `).run();
+      WHERE status = 'PAID' AND substr(paidAt, 1, 10) = ?
+    `).run(todayStr);
 
     db.prepare("UPDATE tables SET status = 'EMPTY'").run();
     db.prepare("UPDATE orders SET status = 'CANCELLED' WHERE status = 'PENDING'").run();
