@@ -733,7 +733,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
 
         {/* Lưới các món ăn */}
-        <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto max-h-[calc(100vh-250px)] md:max-h-none no-scrollbar">
+        <div className="flex-1 p-3.5 sm:p-4 overflow-y-auto overscroll-contain touch-pan-y max-h-[calc(100vh-250px)] md:max-h-none no-scrollbar">
           {loading && menu.length === 0 ? (
             <SkeletonMenuGrid count={6} />
           ) : activeCategory === 'ALL' ? (
@@ -889,7 +889,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
 
         {/* Danh sách các món trong Giỏ hàng */}
-        <div className="flex-1 p-3 overflow-y-auto space-y-2.5 pb-28 sm:pb-3 relative">
+        <div className="flex-1 p-3 overflow-y-auto overscroll-contain touch-pan-y space-y-2.5 pb-28 sm:pb-3 relative">
           {cartLoading ? (
             <div className="p-8 text-center text-gray-400 flex flex-col items-center justify-center h-full animate-pulse">
               <div className="w-8 h-8 border-2 border-coffee-800 border-t-transparent rounded-full animate-spin mb-3"></div>
