@@ -212,6 +212,8 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
   const [showMergeModal, setShowMergeModal] = useState(false);
   const [targetTransferTableId, setTargetTransferTableId] = useState('');
   const [targetMergeTableId, setTargetMergeTableId] = useState('');
+  const [transferAreaFilter, setTransferAreaFilter] = useState('ALL');
+  const [mergeAreaFilter, setMergeAreaFilter] = useState('ALL');
   const [transferring, setTransferring] = useState(false);
 
   // Trạng thái phiếu tạm tính
@@ -468,6 +470,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       alert('Hiện không có bàn nào còn trống để chuyển sang!');
       return;
     }
+    setTransferAreaFilter('ALL');
     setTargetTransferTableId(String(emptyTables[0].id));
     setShowTransferModal(true);
   };
@@ -479,9 +482,40 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
       alert('Hiện không có bàn đang phục vụ nào khác để gộp vào!');
       return;
     }
+    setMergeAreaFilter('ALL');
     setTargetMergeTableId(String(servingTables[0].id));
     setShowMergeModal(true);
   };
+
+  // Danh sách bàn trống phục vụ Chuyển Bàn
+  const emptyTransferTables = useMemo(() => {
+    if (!selectedTable) return [];
+    return tables.filter((t) => t.status === 'EMPTY' && t.id !== selectedTable.id);
+  }, [tables, selectedTable]);
+
+  const transferAreas = useMemo(() => {
+    return ['ALL', ...new Set(emptyTransferTables.map((t) => t.area))];
+  }, [emptyTransferTables]);
+
+  const filteredTransferTables = useMemo(() => {
+    if (transferAreaFilter === 'ALL') return emptyTransferTables;
+    return emptyTransferTables.filter((t) => t.area === transferAreaFilter);
+  }, [emptyTransferTables, transferAreaFilter]);
+
+  // Danh sách bàn đang phục vụ dùng cho Gộp Bàn
+  const servingMergeTables = useMemo(() => {
+    if (!selectedTable) return [];
+    return tables.filter((t) => t.status === 'SERVING' && t.id !== selectedTable.id);
+  }, [tables, selectedTable]);
+
+  const mergeAreas = useMemo(() => {
+    return ['ALL', ...new Set(servingMergeTables.map((t) => t.area))];
+  }, [servingMergeTables]);
+
+  const filteredMergeTables = useMemo(() => {
+    if (mergeAreaFilter === 'ALL') return servingMergeTables;
+    return servingMergeTables.filter((t) => t.area === mergeAreaFilter);
+  }, [servingMergeTables, mergeAreaFilter]);
 
   const handleTransferTable = async () => {
     if (!selectedTable?.id || !targetTransferTableId) return;
@@ -1056,61 +1090,123 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
       )}
 
-      {/* Modal Chuyển Bàn */}
+      {/* Modal Chuyển Bàn - Tối ưu toàn diện cho Điện Thoại & Máy Tính */}
       {showTransferModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl">
-                  <ArrowRightLeft className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90dvh] sm:max-h-[88vh] flex flex-col shadow-2xl border border-gray-100 animate-scaleUp overflow-hidden">
+            {/* Thanh gạt trang trí mobile */}
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 sm:hidden shrink-0" />
+
+            {/* Header cố định */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 bg-amber-100 text-amber-800 rounded-2xl shrink-0">
+                  <ArrowRightLeft className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h3 className="font-black text-gray-900 text-base">Chuyển Bàn POS</h3>
-                  <p className="text-xs text-gray-500">Chuyển toàn bộ đơn từ {selectedTable?.name} sang bàn trống</p>
+                <div className="min-w-0">
+                  <h3 className="font-black text-gray-900 text-base truncate">Chuyển Bàn POS</h3>
+                  <p className="text-xs text-gray-500 truncate">Chuyển toàn bộ đơn từ {selectedTable?.name} sang bàn trống</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowTransferModal(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl"
+                className="p-2 text-gray-400 hover:text-gray-700 active:scale-90 rounded-xl transition cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-3.5 bg-amber-50/70 border border-amber-200/60 rounded-2xl space-y-1 text-xs">
-              <div className="font-bold text-gray-700">
-                Bàn nguồn: <span className="text-amber-900 font-extrabold">{selectedTable?.name} ({selectedTable?.area})</span>
+            {/* Thân cuộn mượt mà trên Mobile (touch-pan-y, overscroll-contain) */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3.5 touch-pan-y">
+              {/* Thông tin bàn nguồn */}
+              <div className="p-3.5 bg-amber-50/80 border border-amber-200/80 rounded-2xl space-y-1.5 text-xs shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 font-semibold">Bàn nguồn:</span>
+                  <span className="text-amber-950 font-extrabold text-sm">{selectedTable?.name} ({selectedTable?.area})</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>Tổng tiền đơn:</span>
+                  <span className="font-bold text-coffee-800 text-xs">{cartTotal.toLocaleString('vi-VN')} đ ({cart.reduce((s, i) => s + i.quantity, 0)} món)</span>
+                </div>
               </div>
-              <div className="text-gray-600">
-                Tổng tiền đơn: <span className="font-bold text-coffee-800">{cartTotal.toLocaleString('vi-VN')} đ</span> ({cart.reduce((s, i) => s + i.quantity, 0)} món)
+
+              {/* Bộ chọn bàn trống */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-800">
+                    Chọn bàn trống đích ({emptyTransferTables.length} bàn sẵn sàng):
+                  </label>
+                  {targetTransferTableId && (
+                    <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">
+                      Đã chọn: {tables.find((t) => String(t.id) === String(targetTransferTableId))?.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Filter Tabs Khu vực */}
+                {transferAreas.length > 2 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 no-scrollbar">
+                    {transferAreas.map((area) => (
+                      <button
+                        key={area}
+                        type="button"
+                        onClick={() => setTransferAreaFilter(area)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer active:scale-95 touch-manipulation ${
+                          transferAreaFilter === area
+                            ? 'bg-amber-600 text-white shadow-xs'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {area === 'ALL' ? 'Tất cả khu vực' : area}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Lưới danh sách thẻ bàn trống - Chạm chọn cực nhạy, vuốt cuộn mượt mà */}
+                {filteredTransferTables.length > 0 ? (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 max-h-52 sm:max-h-60 overflow-y-auto overscroll-contain p-1 rounded-2xl bg-gray-50/80 border border-gray-200/80 touch-pan-y">
+                    {filteredTransferTables.map((t) => {
+                      const isSelected = String(t.id) === String(targetTransferTableId);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setTargetTransferTableId(String(t.id))}
+                          className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer active:scale-95 touch-manipulation min-h-[64px] ${
+                            isSelected
+                              ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-400 shadow-sm'
+                              : 'bg-white hover:bg-amber-50/60 border-gray-200 text-gray-800 hover:border-amber-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-black text-sm truncate">{t.name}</span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : 'bg-emerald-500'}`} />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] mt-1.5 opacity-90">
+                            <span className="truncate">{t.area}</span>
+                            <span className="shrink-0 font-medium">{t.seats} chỗ</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-gray-500 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    Không có bàn trống nào phù hợp với bộ lọc này.
+                  </div>
+                )}
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">Chọn bàn trống đích:</label>
-              <select
-                value={targetTransferTableId}
-                onChange={(e) => setTargetTransferTableId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-coffee-900 outline-none focus:border-coffee-600 shadow-2xs"
-              >
-                {tables
-                  .filter((t) => t.status === 'EMPTY' && t.id !== selectedTable?.id)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      🟢 {t.name} — Khu vực: {t.area} ({t.seats} chỗ)
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            {/* Footer cố định ở đáy */}
+            <div className="flex items-center gap-2.5 p-4 sm:px-5 sm:py-3.5 border-t border-gray-100 bg-white shrink-0">
               <button
                 type="button"
                 onClick={() => setShowTransferModal(false)}
                 disabled={transferring}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
               >
                 Hủy Bỏ
               </button>
@@ -1118,7 +1214,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
                 type="button"
                 onClick={handleTransferTable}
                 disabled={transferring || !targetTransferTableId}
-                className="flex-1 py-2.5 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="flex-1 py-3 bg-amber-600 hover:bg-amber-700 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {transferring ? (
                   <>
@@ -1137,63 +1233,123 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
         </div>
       )}
 
-      {/* Modal Gộp Bàn */}
+      {/* Modal Gộp Bàn - Tối ưu toàn diện cho Điện Thoại & Máy Tính */}
       {showMergeModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl max-w-md w-full p-5 sm:p-6 shadow-2xl border border-gray-100 space-y-4 animate-scaleUp">
-            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 bg-indigo-100 text-indigo-800 rounded-2xl">
-                  <GitMerge className="w-6 h-6" />
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 overflow-y-auto overscroll-contain">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full max-h-[90dvh] sm:max-h-[88vh] flex flex-col shadow-2xl border border-gray-100 animate-scaleUp overflow-hidden">
+            {/* Thanh gạt trang trí mobile */}
+            <div className="w-12 h-1.5 bg-gray-300 rounded-full mx-auto my-2 sm:hidden shrink-0" />
+
+            {/* Header cố định */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-100 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="p-2.5 bg-indigo-100 text-indigo-800 rounded-2xl shrink-0">
+                  <GitMerge className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
-                <div>
-                  <h3 className="font-black text-gray-900 text-base">Gộp Bàn POS</h3>
-                  <p className="text-xs text-gray-500">Gộp tất cả món từ {selectedTable?.name} vào bàn đang phục vụ khác</p>
+                <div className="min-w-0">
+                  <h3 className="font-black text-gray-900 text-base truncate">Gộp Bàn POS</h3>
+                  <p className="text-xs text-gray-500 truncate">Gộp tất cả món từ {selectedTable?.name} vào bàn đang phục vụ khác</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setShowMergeModal(false)}
-                className="p-1.5 text-gray-400 hover:text-gray-700 rounded-xl"
+                className="p-2 text-gray-400 hover:text-gray-700 active:scale-90 rounded-xl transition cursor-pointer shrink-0"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-3.5 bg-indigo-50/70 border border-indigo-200/60 rounded-2xl space-y-1 text-xs">
-              <div className="font-bold text-gray-700">
-                Bàn nguồn: <span className="text-indigo-900 font-extrabold">{selectedTable?.name} ({selectedTable?.area})</span>
+            {/* Thân cuộn mượt mà trên Mobile */}
+            <div className="flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5 space-y-3.5 touch-pan-y">
+              {/* Thông tin bàn nguồn */}
+              <div className="p-3.5 bg-indigo-50/80 border border-indigo-200/80 rounded-2xl space-y-1.5 text-xs shadow-2xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600 font-semibold">Bàn nguồn cần gộp:</span>
+                  <span className="text-indigo-950 font-extrabold text-sm">{selectedTable?.name} ({selectedTable?.area})</span>
+                </div>
+                <div className="flex items-center justify-between text-gray-600">
+                  <span>Tiền đơn gộp:</span>
+                  <span className="font-bold text-coffee-800 text-xs">{cartTotal.toLocaleString('vi-VN')} đ</span>
+                </div>
               </div>
-              <div className="text-gray-600">
-                Tiền đơn: <span className="font-bold text-coffee-800">{cartTotal.toLocaleString('vi-VN')} đ</span>
+
+              {/* Bộ chọn bàn gộp đích */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-bold text-gray-800">
+                    Chọn bàn nhận gộp ({servingMergeTables.length} bàn đang phục vụ):
+                  </label>
+                  {targetMergeTableId && (
+                    <span className="text-[11px] font-bold text-indigo-700 bg-indigo-100 px-2 py-0.5 rounded-full">
+                      Đã chọn: {tables.find((t) => String(t.id) === String(targetMergeTableId))?.name}
+                    </span>
+                  )}
+                </div>
+
+                {/* Filter Tabs Khu vực */}
+                {mergeAreas.length > 2 && (
+                  <div className="flex items-center gap-1.5 overflow-x-auto pb-2 mb-2.5 no-scrollbar">
+                    {mergeAreas.map((area) => (
+                      <button
+                        key={area}
+                        type="button"
+                        onClick={() => setMergeAreaFilter(area)}
+                        className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition cursor-pointer active:scale-95 touch-manipulation ${
+                          mergeAreaFilter === area
+                            ? 'bg-indigo-700 text-white shadow-xs'
+                            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                        }`}
+                      >
+                        {area === 'ALL' ? 'Tất cả khu vực' : area}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Lưới danh sách thẻ bàn đang phục vụ */}
+                {filteredMergeTables.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-52 sm:max-h-60 overflow-y-auto overscroll-contain p-1 rounded-2xl bg-gray-50/80 border border-gray-200/80 touch-pan-y">
+                    {filteredMergeTables.map((t) => {
+                      const isSelected = String(t.id) === String(targetMergeTableId);
+                      return (
+                        <button
+                          key={t.id}
+                          type="button"
+                          onClick={() => setTargetMergeTableId(String(t.id))}
+                          className={`p-3 rounded-xl border text-left transition flex flex-col justify-between cursor-pointer active:scale-95 touch-manipulation min-h-[64px] ${
+                            isSelected
+                              ? 'bg-indigo-700 text-white border-indigo-800 ring-2 ring-indigo-400 shadow-sm'
+                              : 'bg-white hover:bg-indigo-50/60 border-gray-200 text-gray-800 hover:border-indigo-300'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between w-full">
+                            <span className="font-black text-sm truncate">{t.name} ({t.area})</span>
+                            <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : 'bg-amber-500'}`} />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] mt-1.5 opacity-90">
+                            <span>Đơn hiện tại:</span>
+                            <span className="font-bold">{(t.currentOrder?.totalAmount || 0).toLocaleString('vi-VN')} đ</span>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="p-6 text-center text-xs text-gray-500 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    Không có bàn đang phục vụ nào khác phù hợp.
+                  </div>
+                )}
               </div>
             </div>
 
-            <div>
-              <label className="text-xs font-bold text-gray-700 block mb-1.5">
-                Chọn bàn gộp đích (Bàn đang phục vụ):
-              </label>
-              <select
-                value={targetMergeTableId}
-                onChange={(e) => setTargetMergeTableId(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-300 rounded-xl font-bold text-sm text-indigo-950 outline-none focus:border-indigo-600 shadow-2xs"
-              >
-                {tables
-                  .filter((t) => t.status === 'SERVING' && t.id !== selectedTable?.id)
-                  .map((t) => (
-                    <option key={t.id} value={t.id}>
-                      🟡 {t.name} ({t.area}) — Đang có đơn: {(t.currentOrder?.totalAmount || 0).toLocaleString('vi-VN')} đ
-                    </option>
-                  ))}
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 pt-2 border-t border-gray-100">
+            {/* Footer cố định ở đáy */}
+            <div className="flex items-center gap-2.5 p-4 sm:px-5 sm:py-3.5 border-t border-gray-100 bg-white shrink-0">
               <button
                 type="button"
                 onClick={() => setShowMergeModal(false)}
                 disabled={transferring}
-                className="flex-1 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs rounded-xl transition"
+                className="flex-1 py-3 bg-gray-100 hover:bg-gray-200 active:scale-95 text-gray-700 font-bold text-xs rounded-xl transition cursor-pointer"
               >
                 Hủy Bỏ
               </button>
@@ -1201,7 +1357,7 @@ export default function OrderPOS({ selectedTable, setSelectedTable, onCheckoutTa
                 type="button"
                 onClick={handleMergeTable}
                 disabled={transferring || !targetMergeTableId}
-                className="flex-1 py-2.5 bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50"
+                className="flex-1 py-3 bg-indigo-700 hover:bg-indigo-800 active:scale-95 text-white font-bold text-xs rounded-xl shadow-md transition flex items-center justify-center gap-1.5 disabled:opacity-50 cursor-pointer"
               >
                 {transferring ? (
                   <>
